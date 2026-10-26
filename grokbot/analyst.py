@@ -196,3 +196,33 @@ def agrees(verdict, signal):
         return False
     return signal["action"] == "enter" and verdict["bias"] == "long" \
         and verdict["confidence"] >= 0.5
+
+
+def test_provider(cfg, journal):
+    """One real call to the resolved provider. Verifies key, endpoint, and
+    budget accounting end to end. Counts against the daily budget like any
+    other call. Bypasses the enabled flag -- that's the point of the test."""
+    cfg = {**cfg, "analyst": {**cfg["analyst"], "enabled": True}}
+    provider = available(cfg)
+    if not provider:
+        return {"ok": False,
+                "error": ("no provider key found in environment. Set one of: "
+                          "TYPESAFE_API_KEY (Jev), NEBIUS_API_KEY, XAI_API_KEY, "
+                          "OPENROUTER_API_KEY, ZAI_API_KEY -- e.g. "
+                          "`setx TYPESAFE_API_KEY \"...\"` then open a NEW terminal")}
+    signal = {"action": "enter", "reason": "analyst self-test",
+              "ema_fast": 100.0, "ema_slow": 99.0, "rsi": 55.0,
+              "vol_ratio": 1.2}
+    verdict = advise(cfg, journal, "BTC", 80000.0, signal, None)
+    if verdict is None:
+        return {"ok": False, "error": "advise() returned None unexpectedly"}
+    note = verdict.get("note", "")
+    if note.startswith("analyst error"):
+        return {"ok": False, "provider": provider,
+                "error": f"{provider} call failed: {note}"}
+    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return {"ok": True, "provider": provider, "bias": verdict["bias"],
+            "confidence": verdict["confidence"], "note": note,
+            "input_tokens": verdict.get("input_tokens"),
+            "calls_today": journal.get_state(f"analyst_calls_{day}", "0"),
+            "tokens_today": journal.get_state(f"analyst_tokens_{day}", "0")}

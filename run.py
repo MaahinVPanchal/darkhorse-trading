@@ -13,7 +13,7 @@ import argparse
 import json
 import sys
 
-from grokbot import dashboard, doctor, guards, learn, loop, market
+from grokbot import analyst, dashboard, doctor, guards, learn, loop, market
 from grokbot.journal import Journal
 from grokbot.paper import PaperBroker
 
@@ -128,6 +128,23 @@ def cmd_live(cfg, args):
     sys.exit(1)
 
 
+def cmd_analyst_test(cfg, args):
+    journal = Journal()
+    print("Firing one real call at the configured analyst provider...\n")
+    r = analyst.test_provider(cfg, journal)
+    if not r.get("ok"):
+        print(f"FAILED: {r.get('error')}")
+        sys.exit(1)
+    print(f"provider:      {r['provider']}")
+    print(f"verdict:       bias={r['bias']} confidence={r['confidence']:.2f}")
+    print(f"note:          {r['note']}")
+    if r.get("input_tokens"):
+        print(f"input tokens:  {r['input_tokens']} (this call counted against today's budget)")
+    print(f"budget today:  {r['calls_today']} calls / {r['tokens_today']} input tokens")
+    print("\nThe decision layer is connected. Enable it in config.json "
+          "(analyst.enabled) and restart run_paper.bat.")
+
+
 def cmd_dashboard(cfg, args):
     dashboard.serve(cfg, open_browser=not args.no_browser)
 
@@ -141,7 +158,7 @@ def main():
     ap = argparse.ArgumentParser(description="Grokbot paper trading bot")
     ap.add_argument("command",
                     choices=["paper", "report", "learn", "live", "resume",
-                             "dashboard", "doctor"])
+                             "dashboard", "doctor", "analyst-test"])
     ap.add_argument("--once", action="store_true", help="run a single cycle")
     ap.add_argument("--cycles", type=int, default=None, help="run N cycles")
     ap.add_argument("--no-browser", action="store_true",
@@ -154,7 +171,8 @@ def main():
      "live": lambda: cmd_live(cfg, args),
      "resume": lambda: cmd_resume(cfg, args),
      "dashboard": lambda: cmd_dashboard(cfg, args),
-     "doctor": lambda: cmd_doctor(cfg, args)}[args.command]()
+     "doctor": lambda: cmd_doctor(cfg, args),
+     "analyst-test": lambda: cmd_analyst_test(cfg, args)}[args.command]()
 
 
 if __name__ == "__main__":
