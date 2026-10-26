@@ -11,11 +11,17 @@
 
 import argparse
 import json
+import os
 import sys
+
+import requests
 
 from blackhorse import analyst, dashboard, doctor, guards, learn, loop, market
 from blackhorse.journal import Journal
 from blackhorse.paper import PaperBroker
+
+TESTNET_URL = "https://api.hyperliquid-testnet.xyz"
+MAINNET_URL = "https://api.hyperliquid.xyz"
 
 
 def load_cfg():
@@ -186,6 +192,70 @@ def cmd_testnet(cfg, args):
         print("\nStopped. Journal updated in blackhorse.db -- `python run.py report`.")
 
 
+def cmd_account(cfg, args):
+    """READ-ONLY account lookup. Proves connectivity and shows balances.
+    An address can VIEW an account; only its key can TRADE from it."""
+    address = args.address
+    key = os.environ.get("BLACKHORSE_TESTNET_KEY")
+    if not address and key:
+        try:
+            from eth_account import Account
+            address = Account.from_key(key).address
+            print(f"address resolved from BLACKHORSE_TESTNET_KEY: {address}")
+        except Exception:
+            pass
+    if not address:
+        print("No address. Usage: python run.py account --address 0x...")
+        print("(or set BLACKHORSE_TESTNET_KEY and it derives the address)")
+        sys.exit(1)
+
+    for label, base in (("TESTNET", TESTNET_URL), ("MAINNET", MAINNET_URL)):
+        try:
+            r = requests.post(f"{base}/info", json={
+                "type": "clearinghouseState", "user": address, "dex": ""},
+                timeout=12)
+            r.raise_for_status()
+            st = r.json()
+            s = requests.post(f"{base}/info", json={
+                "type": "spotClearinghouseState", "user": address}, timeout=12)
+            s.raise_for_status()
+            spot = s.json()
+        except Exception as e:
+            print(f"[{label}] unreachable from this network "
+                  f"({e.__class__.__name__})")
+            continue
+        ms = st.get("marginSummary", {})
+        print(f"\n[{label}] read-only view of {address}")
+        print(f"  perp account value: ${float(ms.get('accountValue', 0)):.2f}")
+        print(f"  withdrawable:       ${float(st.get('withdrawable', 0)):.2f}")
+        balances = spot.get("balances", [])
+        if balances:
+            print("  spot balances:")
+            for b in balances:
+                if float(b.get("total", 0)) > 0:
+                    print(f"    {b.get('coin')}: total {b.get('total')} "
+                          f"(hold {b.get('hold')})")
+        else:
+            print("  spot balances: none")
+        pos = st.get("assetPositions", [])
+        if pos:
+            for p in pos:
+                pi = p["position"]
+                print(f"  perp position: {pi['coin']} {pi['szi']} "
+                      f"@ entry {pi.get('entryPx')}")
+        else:
+            print("  perp positions: none open")
+        if label == "TESTNET":
+            print("  -> this is your mock-money test account. testnet.bat "
+                  "can trade it once the API key is set.")
+        else:
+            print("  -> shown via mainnet because testnet is filtered on "
+                  "this network; same address, same public API.")
+    print("\nSecurity model: an ADDRESS is public -- anyone can read this "
+          "view. Trading requires the account KEY, which only you hold "
+          "(env var, never chat, never git).")
+
+
 def cmd_dashboard(cfg, args):
     dashboard.serve(cfg, open_browser=not args.no_browser)
 
@@ -199,7 +269,10 @@ def main():
     ap = argparse.ArgumentParser(description="Blackhorse paper trading bot")
     ap.add_argument("command",
                     choices=["paper", "report", "learn", "live", "resume",
-                             "dashboard", "doctor", "analyst-test", "testnet"])
+                             "dashboard", "doctor", "analyst-test", "testnet",
+                             "account"])
+    ap.add_argument("--address", default=None,
+                    help="account: read-only lookup of this 0x address")
     ap.add_argument("--once", action="store_true", help="run a single cycle")
     ap.add_argument("--cycles", type=int, default=None, help="run N cycles")
     ap.add_argument("--no-browser", action="store_true",
@@ -214,7 +287,8 @@ def main():
      "dashboard": lambda: cmd_dashboard(cfg, args),
      "doctor": lambda: cmd_doctor(cfg, args),
      "analyst-test": lambda: cmd_analyst_test(cfg, args),
-     "testnet": lambda: cmd_testnet(cfg, args)}[args.command]()
+     "testnet": lambda: cmd_testnet(cfg, args),
+     "account": lambda: cmd_account(cfg, args)}[args.command]()
 
 
 if __name__ == "__main__":
