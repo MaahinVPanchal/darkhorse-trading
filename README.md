@@ -175,6 +175,15 @@ posts hide.
 
 > The bot's job is to *measure* your real edge — not to promise one.
 
+### 📋 We tested on paper first — and we publish it
+
+We don't claim profits; we claim **process**: paper first, every decision
+journaled, promotion to the next rung only if **pre-registered criteria** pass
+(≥100 trades, positive expectancy after fees, profit factor > 1.2, drawdown
+< 50%). The criteria were written before the results existed.
+
+**→ See [EXPERIMENT_LOG.md](EXPERIMENT_LOG.md) — dated entries, failures included.**
+
 ## 🇮🇳 India note
 
 Hyperliquid's terms don't name India as restricted, but it is **not
