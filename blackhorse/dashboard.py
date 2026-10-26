@@ -138,7 +138,7 @@ PAGE = """<!doctype html>
   .card .k{{font-size:11px;color:#8b949e}} .card .v{{font-size:18px;margin-top:2px}}
   .up{{color:#3fb950}} .down{{color:#f85149}} .warn{{color:#d29922}}
   table{{border-collapse:collapse;width:100%;font-size:12px}}
-  td,th{{border-bottom:1px solid #21262d;padding:4px 8px;text-align:left;white-space:nowrap}}
+  td,th{{border-bottom:1px solid #21262d;padding:4px 8px;text-align:left;white-space:normal}}
   th{{color:#8b949e;font-weight:normal}}
   .feed td{{white-space:normal}} .tag{{font-size:10px;padding:1px 6px;border-radius:8px}}
   .tag.code{{background:#1f6feb33;color:#58a6ff}} .tag.llm{{background:#8957e533;color:#d2a8ff}}

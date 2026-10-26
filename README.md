@@ -1,175 +1,216 @@
-# Blackhorse — trade with $10, never below $5
+<div align="center">
 
-A small, fully inspectable AI trading desk that paper-trades crypto against
-**live Hyperliquid prices**, journals every decision to SQLite, shows itself on
-a **localhost dashboard**, and improves its parameters through a walk-forward
-learning loop. AI (Jev / Nebius / Grok) is a **veto layer only** — code
-enforces all risk.
+# 🐎 Blackhorse Trading
 
-> **Educational software, not financial advice.** Perps can liquidate 100% of
-> an account. Nothing here promises profit — see "Honest expectations".
+### A $10 AI trading desk that refuses to go below $5 — with receipts, not screenshots.
+
+[![Python](https://img.shields.io/badge/python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org)
+[![Status](https://img.shields.io/badge/stage-paper--trading-yellow?style=flat-square)](#-the-ladder-paper--testnet--mainnet)
+[![Dependencies](https://img.shields.io/badge/deps-2-success?style=flat-square)](requirements.txt)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![Live AI](https://img.shields.io/badge/LLM-Jev%20%7C%20Nebius%20%7C%20Grok-8957E5?style=flat-square)](#-where-keys-go-and-where-they-never-go)
+
+**Paper-trades crypto against live Hyperliquid prices • localhost dashboard • AI veto layer • walk-forward learning**
+
+*Educational software — not financial advice. Perps can liquidate 100% of an account.*
+
+<img src="docs/dashboard.png" alt="Blackhorse live dashboard: stat cards, equity curve with the $5 floor as a red line, agent hive, decision feed with CODE vs CODE+LLM tags" width="100%">
+
+</div>
 
 ---
 
-## Quick start (no account, no keys, no money)
+## 📖 Table of Contents
 
-Double-click in `D:\Blackhorse`:
+- [Why this exists](#-why-this-exists)
+- [Quick Start](#-quick-start-no-account-no-keys-no-money)
+- [The Dashboard](#-the-dashboard-what-is-happening-right-now)
+- [The Agent Hive](#-the-agent-hive-who-does-what)
+- [Where keys go](#-where-keys-go-and-where-they-never-go)
+- [The Ladder](#-the-ladder-paper--testnet--mainnet)
+- [How it learns](#-how-it-learns-honestly)
+- [Repo comparison](#-how-it-compares-to-the-public-repos)
+- [Honest numbers](#-honest-numbers)
+- [India note](#-india-note)
 
-| File | What it does |
+## 🎯 Why this exists
+
+X.com is full of *"Grok bot turned $14 into $7,643"* screenshots. We checked —
+they're survivorship bait (even [Grok itself debunked one](https://x.com/sector_sol/status/2114260024675741783)).
+The **one transparent public experiment** ($10,000, 22 hours, real account, on
+camera) made **$0.84**.
+
+So this project is built the boring, honest way:
+
+- **Deterministic strategy core** (EMA cross + RSI + volume) — every signal replayable
+- **Risk enforced in code, never in prompts** — the LLM can veto a trade, never place one
+- **Everything journaled** — every decision, fill, and equity mark in SQLite
+- **AI = referee, not gambler** — Jev/Nebius may only say "skip"; they never size or execute
+- **A floor that halts the bot**: `$10 in → equity touches $5 → everything flattens`
+
+## ⚡ Quick Start (no account, no keys, no money)
+
+```bash
+pip install -r requirements.txt   # requests + hyperliquid sdk — that's all
+```
+
+| Double-click | What happens |
 |---|---|
-| `run_paper.bat` | start paper trading on live prices (leave window open) |
-| `run_dashboard.bat` | open **http://127.0.0.1:8765** — see what's happening live |
-| `run_report.bat` | console scoreboard: equity, win rate, profit factor, drawdown, fees |
-| `run_learn.bat` | walk-forward parameter search → `learned_proposals.json` |
-| `doctor.bat` | pre-flight checks (python, API, config, DB, keys, port) |
-| `resume.bat` | re-enable trading after the equity floor halt |
+| 🟢 `run_paper.bat` | **paper-trades live crypto prices** with simulated money. Leave the window open. |
+| 📊 `run_dashboard.bat` | opens **http://127.0.0.1:8765** — watch the agents work |
+| 🧾 `run_report.bat` | scoreboard: equity, win rate, profit factor, drawdown, fees |
+| 🧠 `run_learn.bat` | walk-forward parameter search → `learned_proposals.json` |
+| 🩺 `doctor.bat` | pre-flight: python, API, config, DB, keys, ports, testnet |
+| 🔑 `connect_wallet.bat` | **one-time**: paste your testnet API key (hidden prompt) → auto-saves, verifies, shows balances |
+| 🤖 `analyst_test.bat` | fires **one real call** at Jev/Nebius — proves your AI key works |
+| 🧪 `testnet.bat` | **real signed orders, mock money** on Hyperliquid testnet |
+| 🔓 `resume.bat` | re-enable trading after the equity-floor halt |
 
-CLI equivalent: `python run.py paper|report|learn|dashboard|doctor|resume|live`.
+CLI: `python run.py paper|report|learn|dashboard|doctor|resume|testnet|account|analyst-test|live`
 
-## What the dashboard shows (beebots.tech style, zero dependencies)
+## 🖥️ The Dashboard (what is happening right now)
 
-Dark terminal page, auto-refresh every 15s, no npm/CDN needed:
+Auto-refreshing dark terminal page — zero npm, zero CDN, pure Python + SVG:
 
-- **Stat cards**: equity, return vs start, max drawdown, win rate/trades,
-  expectancy per trade, profit factor, fees paid, equity floor.
-- **Equity curve** (server-side SVG) with the **$5 floor drawn as a red line**.
-- **Agent hive**: every agent, its key/connection, and exactly what power it has.
-- **Decision feed**: what the agents are saying, tagged `CODE` vs `CODE+LLM`
-  (who actually decided — the beebots pattern).
-- **Open positions & recent fills** with unrealized PnL, stops, targets.
-- JSON API at `/api/data` for your own scripts.
+| Panel | You see |
+|---|---|
+| Stat cards | equity, return vs start, max drawdown, win rate, expectancy/trade, profit factor, fees, **equity floor** |
+| Equity curve | live SVG with the **$5 floor drawn as a red line** |
+| Agent hive | every agent + its key/connection + exactly what power it has |
+| Decision feed | every enter/skip/wait/exit tagged **`CODE`** vs **`CODE+LLM`** — who actually decided |
+| Positions & fills | open positions with stops/targets, last 25 fills with PnL |
+| JSON API | `GET /api/data` — build your own views |
 
-## The agents and how their keys are connected
+## 🤖 The Agent Hive (who does what)
 
-Communication is a **blackboard** (the SQLite journal), not a chat group. Every
-agent reads and appends; the loop orders the turns.
+Communication is a **blackboard** (the SQLite journal) — not a chat group where
+agents echo each other into confidence.
 
-| Agent | Module | Key / connection | Can do | Cannot do |
+| Agent | Module | Key | Power | Cannot |
 |---|---|---|---|---|
-| Signal | `strategy.py` | none — local code | propose enter/exit | execute, size |
-| Risk Officer | `risk.py` | none — local code | veto: caps, cooldown, loss limit | approve anything |
-| Execution | `paper.py` | none (paper) / trade-only API wallet (live) | fill, TP/SL | move its own limits |
-| Account Guard | `guards.py` | none — local code | floor breach → flatten + halt | resume itself |
-| Analyst | `analyst.py` | `TYPESAFE_API_KEY` (Jev) / `NEBIUS_API_KEY` / `XAI_API_KEY` / `OPENROUTER_API_KEY` / `ZAI_API_KEY` | log opinions or veto entries (`mode: "gate"`) | open/size/modify trades, touch keys |
-| Coach | `learn.py` | none — local code | propose config edits | apply them |
+| 📡 Signal | `strategy.py` | none | propose enter/exit | execute, size |
+| 🛡️ Risk Officer | `risk.py` | none | veto: caps, cooldown, loss limit | approve anything |
+| ⚡ Execution | `paper.py` / `testnet_broker.py` | none / trade-only API wallet | fill, TP/SL | move its own limits |
+| 🚨 Account Guard | `guards.py` | none | floor breach → flatten + **halt latch** | resume itself |
+| 🧙 Analyst | `analyst.py` | `TYPESAFE_API_KEY` (Jev) / `NEBIUS_API_KEY` / `XAI_API_KEY` / `OPENROUTER_API_KEY` / `ZAI_API_KEY` | log opinions or **veto entries** (`mode: "gate"`) | open/size/modify trades |
+| 🎓 Coach | `learn.py` | none | propose config edits | apply them |
 
-Key rules: keys live in **environment variables** (`setx NAME "value"`), never
-in code or the repo. The daily analyst budget (200 calls / 200k input tokens
-by default) is persisted in SQLite — restarts can't reset it; over budget the
-bot falls back to rules-only. Jev costs ~$0.042 per **million** input tokens
-with output free, so a $5 credit is effectively unlimited for this workload.
+## 🔑 Where keys go (and where they never go)
 
-### How the agents reach Hyperliquid — "just connect and trade"?
+Keys live **only in Windows environment variables** — never in chat, never in
+this repo, never in a file:
 
-No — and the difference matters. `app.hyperliquid.xyz/trade` is the **human**
-client:
-
-- **You (browser)**: click "Connect Wallet" → MetaMask signs an ownership
-  message → the site sends signed actions to the same backend the bots use.
-- **The bot (no browser)**: it never opens or "sees" the website. It talks to
-  the **API** directly: public reads via `POST /info` (what we use in paper
-  mode — no key at all), and orders via `POST /exchange`, where every action is
-  cryptographically signed with a wallet key (EIP-712 structured signatures).
-  For a bot you create a separate **API wallet** on Hyperliquid — a delegated
-  key that can **trade but cannot withdraw** — so the bot never holds your
-  seed phrase. beebots enforces the same shape: "the model is stateless and
-  never sees an order endpoint"; signed calls go through the exchange kit.
-- The live adapter (deliberately not built yet) will use the official
-  `hyperliquid-python-sdk` with a trade-only API wallet, exchange-side stops,
-  and a dead-man's switch — the loop-side floor check in `guards.py` is a
-  backstop, not a substitute.
-
-## Files (and what changed in the 26 Oct build session)
-
-```
-run.py                  CLI: paper/report/learn/resume/dashboard/doctor/live
-config.json             symbols, risk caps, floor, fees, analyst providers+budget
-requirements.txt        requests only
-START_HERE.md           beginner guide (run today, account path, India notes)
-AGENTS_AND_STRATEGIES.md  agent roster, strategy families, honest eval rules
-run_paper.bat / run_report.bat / run_learn.bat
-run_dashboard.bat / doctor.bat / resume.bat
-blackhorse/
-  market.py     Hyperliquid public data (no keys needed to read)
-  strategy.py   EMA cross + RSI + volume signals on CLOSED candles
-  risk.py       veto layer: caps, daily loss limit, cooldown-after-stop-loss
-  paper.py      simulated broker: fees (4.5 bps) + slippage (5 bps) modeling
-  journal.py    SQLite: fills, positions, decisions, equity, state (halts, budget)
-  guards.py     $5 equity floor -> flatten + halt latch; resume by human only
-  analyst.py    Jev (native /v1/systemone Choice+Noul) + Nebius/Grok/OpenRouter/ZAI
-                (OpenAI-compatible), daily budget cap, graceful fallback
-  learn.py      walk-forward grid search (train 70% / validate 30%) -> proposals
-  loop.py       orchestration: guard -> TP/SL -> signal -> analyst gate -> risk -> fill
-  dashboard.py  localhost web UI (stdlib http.server, SVG equity curve)
-  doctor.py     pre-flight checks
+```bat
+setx TYPESAFE_API_KEY "jev-key"        :: your $5 Jev credit (~119B input tokens — effectively unlimited)
+setx NEBIUS_API_KEY "nebius-key"       :: fallback, OpenAI-compatible
+setx BLACKHORSE_TESTNET_KEY "0x..."    :: testnet API-wallet key (trade-only, CANNOT withdraw)
 ```
 
-Recent changes: equity floor + halt latch + `resume`; profit-factor/drawdown/
-fee-share reporting; Jev + Nebius providers with persisted spend cap;
-**localhost dashboard**; `doctor` pre-flight; cooldown after a stop-loss
-(30 min default); live ACK gate; signals on closed candles only; thread-safe
-dashboard DB access. **v0.3**: renamed to **blackhorse-trading**; testnet
-execution adapter (`testnet.bat`, `blackhorse/testnet_broker.py`) using the
-official Hyperliquid SDK; `analyst-test` one-call key verification.
+Then reopen terminals → verify with `analyst_test.bat` → set `"analyst": {"enabled": true}`
+in `config.json`. Daily AI budget (default **200 calls / 200k input tokens**) is
+persisted in SQLite — restarts can't reset it; over budget the bot falls back
+to rules-only.
 
-## How each public repo's code/patterns are used in THIS codebase
+> ⚠️ **Never** paste a private key into chat, WhatsApp, screenshots, or GitHub.
+> An address can *view* an account — only its key can *trade* it.
 
-Not copied — distilled. Every borrowed idea maps to a specific file:
+## 🪜 The Ladder (paper → testnet → mainnet)
 
-| Repo | Pattern taken | Where it lives here |
-|---|---|---|
-| **beebots** | Model never sees the order endpoint | `analyst.py` gets indicator snapshots only; `paper.py`/`testnet_broker.py` are the only order-touching code |
-| **beebots** | Explicit live ACK (`LIVE_ACK=I-ACCEPT-REAL-MONEY-RISK`) | `run.py:cmd_live` + `config.json live.acknowledgement` — engine refuses without the exact string |
-| **beebots** | "Who decided" tags (model vs code) | decision feed on `dashboard.py`, `CODE` / `CODE+LLM` tags from `journal.decisions.analyst_note` |
-| **beebots** | Deterministic fallback when model is slow/over-budget | `analyst.advise` returns rules-only on missing key, 401, or budget cap; loop never blocks |
-| **beebots** | Stops never wait for the model | `loop.run_cycle`: TP/SL check is step 1, analyst is consulted only for entries |
-| **hypergrok-trading-desk** | Pre-flight desk doctor | `doctor.py` (network, config sanity, DB, keys, port, testnet reachability) |
-| **hypergrok-trading-desk** | One-writer execution + keyless reads | only `paper.py`/`testnet_broker.py` place orders; `market.py` needs no key |
-| **jev-trader** | Mock/dry-run first, Jev env key | `paper.py` default; `TYPESAFE_API_KEY`; `analyst-test` one-call verification |
-| **jev-trader / typesafe docs** | Typed decision questions (Choice/Noul) | `analyst._advise_jev`: `enter` Choice + `trend_continues` Noul with confidence |
-| **TradingAgents** | Memory then reflection loop | `journal.py` (blackboard) + `learn.py` proposals; debate roles rejected — agents repeat bias |
-| **AI-Trader** | Skill-file self-registration, leaderboards | noted for later; not needed at one-desk scale |
-| **chainstack hyperliquid bot** | Testnet default, validate before run | `testnet_broker.py` + `doctor` + config-gated `testnet.enabled` |
-| **Freqtrade** | Dry-run classic, fee/slippage honesty | `paper.py` models 4.5 bps fee + 5 bps slippage on every simulated fill |
+```
+ ① PAPER ──────── live prices, simulated money, no keys        ← you are here
+ ② TESTNET ───── real signed orders, MOCK money (your test ETH/USDC)
+ ③ MAINNET ───── $10 real, trade-only API wallet, ACK gate
+```
 
-## The ladder: paper → testnet → mainnet
+- **①** runs today: `run_paper.bat`.
+- **②** needs the API key: testnet site → **API page** → *Approve API Wallet* →
+  sign in MetaMask (free) → copy the private key → `connect_wallet.bat` →
+  `testnet.enabled: true` → `testnet.bat`. Same guards: $5 floor, daily loss
+  cap, cooldowns, halt latch.
+- **③** unlocks only when `live.enabled = true` **and**
+  `live.acknowledgement = "I-ACCEPT-REAL-MONEY-RISK"` — the engine refuses
+  otherwise. Weeks of positive paper expectancy and India tax/legal clearance
+  come first. Perps have a ~$10 minimum order size.
 
-1. **Paper (free, now)** — `run_paper.bat`. Trains the strategy on live prices
-   with simulated fills. Needs nothing.
-2. **Testnet (mock money, real mechanics)** — `testnet.bat` places **real
-   signed orders** on Hyperliquid testnet using your testnet ETH/USDC:
-   1. `pip install hyperliquid-python-sdk` (already in requirements.txt)
-   2. at `app.hyperliquid-testnet.xyz` → API page, create a **trade-only API
-      wallet** (cannot withdraw), copy its key
-   3. `setx BLACKHORSE_TESTNET_KEY "..."` — **testnet key only, never mainnet**
-   4. set `testnet.enabled: true` in config.json → `testnet.bat`
-   The adapter (`blackhorse/testnet_broker.py`) uses the official SDK's
-   `market_open`/`market_close`, rounds size to each coin's `szDecimals`,
-   pulls account equity from the exchange, and still enforces the same
-   guards: $5 floor, daily loss cap, cooldowns, halt latch. If your network
-   cannot reach `api.hyperliquid-testnet.xyz` (doctor will show it), stay in
-   paper mode — the strategy code is identical.
-3. **Mainnet ($10, later)** — only after weeks of positive paper expectancy
-   AND India tax/legal clearance; `live.enabled` + the ACK string; trade-only
-   API wallet; treat the $10 as tuition.
+## 🧠 How it learns (honestly)
 
-## Honest expectations
+An LLM cannot rewrite its own weights from trading. So the loop is real
+engineering: **journal → measure → walk-forward re-optimize → propose → human
+applies**. `run_learn.bat` replays ~1,500 recent candles per coin, grid-searches
+EMA/TP/SL combos on a **70/30 train/validate split**, and writes
+`learned_proposals.json` with validation stats. The bot never edits its own
+brain — that road is curve fitting.
 
-The public evidence (population studies of ~825k Hyperliquid wallets, LLM agent
-fleet studies, Alpha Arena) says **most retail and AI-agent traders lose after
-costs**. Our own first learning run found the best BTC parameter set loses
-−1.87%/trade on validation data. That is the point of building it honestly:
-measure, don't believe screenshots. Viral "$14 → $7,643" posts are
-survivorship-bait; the one transparent public experiment ($10k, 22h, on camera)
-made **$0.84**.
+**First run's honest result:** the *best* BTC parameter set found lost
+**−1.87%/trade** on validation data. That's the baseline reality the viral
+posts hide.
 
-## Path to real money (all four, in order)
+## 🧪 How it compares to the public repos
 
-1. **Paper for weeks** — positive expectancy over many trades, across market regimes.
-2. **Clear India access/tax** with a qualified adviser (Hyperliquid is not
-   FIU-registered as far as research found; VDA gains ~30% + 1% TDS; losses
-   can't be set off).
-3. **Testnet** with a trade-only API wallet (can trade, cannot withdraw).
-4. Only then: set `live.enabled=true` AND
-   `live.acknowledgement="I-ACCEPT-REAL-MONEY-RISK"` — the engine refuses
-   otherwise. Even so, start with an amount you are fine losing entirely.
+| Repo | What it is | How the LLM connects | Real or paper? |
+|---|---|---|---|
+| [TradingAgents](https://github.com/tauricresearch/tradingagents) (~80k★) | Simulated trading firm on LangGraph: fundamentals/sentiment/news/technical analysts → bull-vs-bear researcher debate → trader → risk team → portfolio manager | Any provider via env keys (OpenAI, Grok, DeepSeek, Gemini, OpenRouter, local Ollama); two tiers — `quick_think_llm` for analysts, `deep_think_llm` for managers | **Paper only** — simulated exchange, no real execution |
+| [AI-Trader](https://github.com/HKUDS/AI-Trader) (~23k★, HKU) | Agent-native platform: AI agents publish signals, copy each other; FastAPI + React, leaderboards | Agents self-register via a SKILL.md URL (OpenClaw, Claude Code, Cursor…) | **Paper** ($100K simulated); real money only via your own broker signal-sync |
+| [chainstacklabs/hyperliquid-trading-bot](https://github.com/chainstacklabs/hyperliquid-trading-bot) | Grid-trading bot for Hyperliquid (YAML strategies, conservative BTC grid) | No LLM — but the exchange wiring is the reference: private key in `.env`, testnet default, `--validate` check, WebSocket data | **Testnet by default**, mainnet only if you flip it |
+| [hypergrok-trading-desk](https://github.com/galleonlabs/hypergrok-trading-desk) | 7-role trading desk on Hyperliquid (SKILL.md; works with Grok Bot/Claude) | Keyless public reads; execution only via a trade-only API wallet | **Testnet first**, then mainnet |
+| [jev-trader](https://github.com/jarrodwatts/jev-trader) (~3.1k★) | Jev decides every Monad block (~300ms), post-only limit orders | `TYPESAFE_AI_API_KEY` env var; MockModel fallback | **Dry-run by default** |
+| [Freqtrade](https://github.com/freqtrade/freqtrade) | The granddad of open-source bots (Python, web UI, plotting) | No LLM natively | **Dry-run mode** is the classic pattern |
+| [beebots](https://github.com/imikerussell/beebots) | Three AI bees on OKX; decisions by Jev; paper by default | Jev/Gemini via env keys; model stateless, never sees the order endpoint | **Paper by default**; live needs explicit ACK |
+
+**What Blackhorse took from each** (and where it lives):
+
+- beebots → model never sees the order endpoint · live ACK string · `CODE`/`CODE+LLM` tags · code fallback on budget/latency *(analyst.py, run.py, dashboard.py)*
+- hypergrok → pre-flight `doctor` · one-writer execution · keyless reads *(doctor.py, market.py)*
+- jev-trader → Jev Choice/Noul veto questions · dry-run-first *(analyst.py, paper.py)*
+- TradingAgents → memory-then-reflection loop, **not** agent debate *(journal.py, learn.py)*
+- chainstack → testnet-default + validate-before-run *(config gates, doctor.py)*
+- Freqtrade → dry-run classic with honest fee/slippage modeling *(paper.py: 4.5 bps + 5 bps)*
+
+## 📉 Honest numbers
+
+- Population studies (~825k Hyperliquid wallets): **most traders lose after costs**; median realized PnL per wallet: −$1.41
+- Alpha Arena (6 models, real $10k each): 2 up, **4 down 42–59%** — variance, not skill
+- beebots (2.4M AI decisions, 30 days): **−$214**
+- This repo's first learning run: best BTC combo **−1.87%/trade** after fees
+
+> The bot's job is to *measure* your real edge — not to promise one.
+
+## 🇮🇳 India note
+
+Hyperliquid's terms don't name India as restricted, but it is **not
+FIU-registered** as far as research found; legality of using it from India is
+unconfirmed. VDA gains ≈ **30% flat + 1% TDS**, losses can't be set off. Clear
+this with a qualified adviser before rung ③. Nothing here is financial, legal,
+or tax advice.
+
+## 🗂 Files
+
+```
+run.py                  CLI: paper|report|learn|resume|dashboard|doctor|analyst-test|testnet|account|live
+config.json             every knob: symbols, risk caps, floor, fees, analyst providers + budget
+connect_wallet.py/.bat  one-time: hidden key prompt -> setx -> verify -> balances
+grokbot→blackhorse/
+  market.py             Hyperliquid public data (no keys to read)
+  strategy.py           EMA cross + RSI + volume, closed candles only
+  risk.py               veto layer: caps, loss limit, cooldown
+  paper.py              simulated broker: 4.5 bps fee + 5 bps slippage
+  testnet_broker.py     real signed orders via official SDK (testnet)
+  journal.py            SQLite blackboard: fills, positions, decisions, equity, state
+  guards.py             $5 equity floor -> flatten + halt latch
+  analyst.py            Jev (/v1/systemone Choice+Noul) + Nebius/Grok/OpenRouter/ZAI
+  learn.py              walk-forward grid search -> proposals
+  loop.py               guard -> TP/SL -> signal -> analyst gate -> risk -> fill
+  dashboard.py          localhost UI (stdlib, SVG curve)
+  doctor.py             pre-flight checks
+```
+
+## 📜 License
+
+MIT — see [LICENSE](LICENSE). Use at your own risk. The authors take no
+responsibility for trading losses; perps can liquidate your entire account.
+
+<div align="center">
+
+**Built to measure, not to promise.** 🐎
+
+</div>
