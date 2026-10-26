@@ -1,4 +1,4 @@
-# Grokbot — trade with $10, never below $5
+# Blackhorse — trade with $10, never below $5
 
 A small, fully inspectable AI trading desk that paper-trades crypto against
 **live Hyperliquid prices**, journals every decision to SQLite, shows itself on
@@ -13,7 +13,7 @@ enforces all risk.
 
 ## Quick start (no account, no keys, no money)
 
-Double-click in `D:\Grokbot`:
+Double-click in `D:\Blackhorse`:
 
 | File | What it does |
 |---|---|
@@ -89,7 +89,7 @@ START_HERE.md           beginner guide (run today, account path, India notes)
 AGENTS_AND_STRATEGIES.md  agent roster, strategy families, honest eval rules
 run_paper.bat / run_report.bat / run_learn.bat
 run_dashboard.bat / doctor.bat / resume.bat
-grokbot/
+blackhorse/
   market.py     Hyperliquid public data (no keys needed to read)
   strategy.py   EMA cross + RSI + volume signals on CLOSED candles
   risk.py       veto layer: caps, daily loss limit, cooldown-after-stop-loss
@@ -108,30 +108,50 @@ Recent changes: equity floor + halt latch + `resume`; profit-factor/drawdown/
 fee-share reporting; Jev + Nebius providers with persisted spend cap;
 **localhost dashboard**; `doctor` pre-flight; cooldown after a stop-loss
 (30 min default); live ACK gate; signals on closed candles only; thread-safe
-dashboard DB access.
+dashboard DB access. **v0.3**: renamed to **blackhorse-trading**; testnet
+execution adapter (`testnet.bat`, `blackhorse/testnet_broker.py`) using the
+official Hyperliquid SDK; `analyst-test` one-call key verification.
 
-## What we learned from public AI-trading repos
+## How each public repo's code/patterns are used in THIS codebase
 
-Surveyed before building (details in `AGENTS_AND_STRATEGIES.md`):
+Not copied — distilled. Every borrowed idea maps to a specific file:
 
-- **[beebots](https://github.com/imikerussell/beebots)** — three AI bees on OKX,
-  decisions by Jev, paper by default. Adopted: model-is-stateless / never sees
-  the order endpoint; explicit live ACK string; "who decided" tags; deterministic
-  code fallback when the model is unavailable or over budget; stops never wait
-  for the model.
-- **[hypergrok-trading-desk](https://github.com/galleonlabs/hypergrok-trading-desk)**
-  — 7-role desk on Hyperliquid. Adopted: `doctor` pre-flight, one-writer
-  execution, ticket-style inspectability.
-- **[jev-trader](https://github.com/jarrodwatts/jev-trader)** — Jev decision
-  loop reference; confirmed the API shape and the mock/dry-run-first pattern.
-- **[TradingAgents](https://github.com/tauricresearch/tradingagents)** (80k+
-  stars), **[AI-Trader](https://github.com/HKUDS/AI-Trader)**,
-  **[Freqtrade](https://github.com/freqtrade/freqtrade)** — multi-agent debate
-  and web-UI patterns; noted but not copied: agent debate ≠ independent checks,
-  and heavy frameworks hide the risk logic we want in plain sight.
-- ⚠️ Anonymous GitHub repos matching "AI trading bot + guaranteed profit" are a
-  common scam pattern for stealing keys/deposits. Everything here is readable
-  code with zero deps beyond `requests`.
+| Repo | Pattern taken | Where it lives here |
+|---|---|---|
+| **beebots** | Model never sees the order endpoint | `analyst.py` gets indicator snapshots only; `paper.py`/`testnet_broker.py` are the only order-touching code |
+| **beebots** | Explicit live ACK (`LIVE_ACK=I-ACCEPT-REAL-MONEY-RISK`) | `run.py:cmd_live` + `config.json live.acknowledgement` — engine refuses without the exact string |
+| **beebots** | "Who decided" tags (model vs code) | decision feed on `dashboard.py`, `CODE` / `CODE+LLM` tags from `journal.decisions.analyst_note` |
+| **beebots** | Deterministic fallback when model is slow/over-budget | `analyst.advise` returns rules-only on missing key, 401, or budget cap; loop never blocks |
+| **beebots** | Stops never wait for the model | `loop.run_cycle`: TP/SL check is step 1, analyst is consulted only for entries |
+| **hypergrok-trading-desk** | Pre-flight desk doctor | `doctor.py` (network, config sanity, DB, keys, port, testnet reachability) |
+| **hypergrok-trading-desk** | One-writer execution + keyless reads | only `paper.py`/`testnet_broker.py` place orders; `market.py` needs no key |
+| **jev-trader** | Mock/dry-run first, Jev env key | `paper.py` default; `TYPESAFE_API_KEY`; `analyst-test` one-call verification |
+| **jev-trader / typesafe docs** | Typed decision questions (Choice/Noul) | `analyst._advise_jev`: `enter` Choice + `trend_continues` Noul with confidence |
+| **TradingAgents** | Memory then reflection loop | `journal.py` (blackboard) + `learn.py` proposals; debate roles rejected — agents repeat bias |
+| **AI-Trader** | Skill-file self-registration, leaderboards | noted for later; not needed at one-desk scale |
+| **chainstack hyperliquid bot** | Testnet default, validate before run | `testnet_broker.py` + `doctor` + config-gated `testnet.enabled` |
+| **Freqtrade** | Dry-run classic, fee/slippage honesty | `paper.py` models 4.5 bps fee + 5 bps slippage on every simulated fill |
+
+## The ladder: paper → testnet → mainnet
+
+1. **Paper (free, now)** — `run_paper.bat`. Trains the strategy on live prices
+   with simulated fills. Needs nothing.
+2. **Testnet (mock money, real mechanics)** — `testnet.bat` places **real
+   signed orders** on Hyperliquid testnet using your testnet ETH/USDC:
+   1. `pip install hyperliquid-python-sdk` (already in requirements.txt)
+   2. at `app.hyperliquid-testnet.xyz` → API page, create a **trade-only API
+      wallet** (cannot withdraw), copy its key
+   3. `setx BLACKHORSE_TESTNET_KEY "..."` — **testnet key only, never mainnet**
+   4. set `testnet.enabled: true` in config.json → `testnet.bat`
+   The adapter (`blackhorse/testnet_broker.py`) uses the official SDK's
+   `market_open`/`market_close`, rounds size to each coin's `szDecimals`,
+   pulls account equity from the exchange, and still enforces the same
+   guards: $5 floor, daily loss cap, cooldowns, halt latch. If your network
+   cannot reach `api.hyperliquid-testnet.xyz` (doctor will show it), stay in
+   paper mode — the strategy code is identical.
+3. **Mainnet ($10, later)** — only after weeks of positive paper expectancy
+   AND India tax/legal clearance; `live.enabled` + the ACK string; trade-only
+   API wallet; treat the $10 as tuition.
 
 ## Honest expectations
 

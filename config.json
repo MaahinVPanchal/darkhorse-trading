@@ -42,6 +42,12 @@
     "note": "Decision layer, veto-only. provider 'auto' tries keys in order: Jev (TYPESAFE_API_KEY, ~$0.042/M input tokens, output free -- the cheapest by far), Nebius (NEBIUS_API_KEY, OpenAI-compatible), then xAI/OpenRouter/ZAI. model=null uses each provider's default; set e.g. 'meta-llama/Llama-3.3-70B-Instruct' for Nebius. mode 'gate' lets the analyst veto entries only; it can never raise size, leverage, or trade count, and the daily budget cap in state makes the $5 credit last for months."
   },
 
+  "testnet": {
+    "enabled": false,
+    "slippage": 0.05,
+    "note": "Rung 2 of the ladder: REAL signed orders, MOCK money on Hyperliquid testnet. Requires: 1) pip install hyperliquid-python-sdk, 2) a TESTNET API wallet key: setx BLACKHORSE_TESTNET_KEY \"...\" (create at app.hyperliquid-testnet.xyz -> API; trade-only, cannot withdraw), 3) enabled=true, then 'python run.py testnet'. Never put a mainnet key here. If your network cannot reach api.hyperliquid-testnet.xyz, doctor will show it -- stay in paper mode until it can."
+  },
+
   "live": {
     "enabled": false,
     "acknowledgement": "",

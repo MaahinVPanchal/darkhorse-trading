@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Grokbot CLI.
+"""Blackhorse CLI.
 
   python run.py paper            run paper trading continuously (Ctrl-C to stop)
   python run.py paper --once     one single cycle
@@ -13,9 +13,9 @@ import argparse
 import json
 import sys
 
-from grokbot import analyst, dashboard, doctor, guards, learn, loop, market
-from grokbot.journal import Journal
-from grokbot.paper import PaperBroker
+from blackhorse import analyst, dashboard, doctor, guards, learn, loop, market
+from blackhorse.journal import Journal
+from blackhorse.paper import PaperBroker
 
 
 def load_cfg():
@@ -34,7 +34,7 @@ def cmd_paper(cfg, args):
                  cycles=(1 if args.once else args.cycles),
                  use_analyst=True)
     except KeyboardInterrupt:
-        print("\nStopped. Journal saved in grokbot.db -- run `python run.py report`.")
+        print("\nStopped. Journal saved in blackhorse.db -- run `python run.py report`.")
 
 
 def cmd_report(cfg, args):
@@ -44,7 +44,7 @@ def cmd_report(cfg, args):
     start = cfg["paper"]["start_balance_usd"]
     floor, floor_desc = guards.effective_floor(cfg)
     print("=" * 60)
-    print("GROKBOT PAPER REPORT")
+    print("BLACKHORSE PAPER REPORT")
     print("=" * 60)
     if guards.is_halted(journal):
         print(f"*** HALTED: {journal.get_state('halt_reason')} ***")
@@ -145,6 +145,47 @@ def cmd_analyst_test(cfg, args):
           "(analyst.enabled) and restart run_paper.bat.")
 
 
+def cmd_testnet(cfg, args):
+    """Rung 2: real signed orders, MOCK money on Hyperliquid testnet."""
+    t = cfg.get("testnet", {})
+    if not t.get("enabled"):
+        print("Testnet trading is disabled (config testnet.enabled=false).")
+        print("Setup: 1) pip install hyperliquid-python-sdk")
+        print("       2) create a TESTNET API wallet at app.hyperliquid-testnet.xyz")
+        print('       3) setx BLACKHORSE_TESTNET_KEY "..."   (trade-only key)')
+        print("       4) set testnet.enabled=true in config.json")
+        sys.exit(1)
+    from blackhorse.testnet_broker import TestnetBroker, TESTNET_URL, SDK_AVAILABLE
+    if not SDK_AVAILABLE:
+        print("hyperliquid-python-sdk is not installed: pip install hyperliquid-python-sdk")
+        sys.exit(1)
+    journal = Journal()
+    try:
+        broker = TestnetBroker(journal, cfg)  # raises with setup help if key missing
+    except RuntimeError as e:
+        print(f"Testnet setup problem: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Could not initialize the testnet connection: "
+              f"{e.__class__.__name__}: {e}")
+        print("If this is an SSL/network error, your network cannot reach "
+              "api.hyperliquid-testnet.xyz -- run doctor, or try another "
+              "network. Paper mode keeps working meanwhile.")
+        sys.exit(1)
+    account = broker.equity()
+    # scale the floor/loss-limit math to the testnet account (floor stays $5)
+    cfg["paper"]["start_balance_usd"] = max(
+        2 * cfg["halt"]["equity_floor_usd"], account)
+    print(f"TESTNET mode on {TESTNET_URL}")
+    print(f"wallet: {broker.address}  |  account value: ${account:.2f} (mock money)")
+    print("This places REAL signed orders on testnet. Ctrl-C to stop.\n")
+    try:
+        loop.run(journal, broker, cfg, cycles=(1 if args.once else args.cycles),
+                 use_analyst=True)
+    except KeyboardInterrupt:
+        print("\nStopped. Journal updated in blackhorse.db -- `python run.py report`.")
+
+
 def cmd_dashboard(cfg, args):
     dashboard.serve(cfg, open_browser=not args.no_browser)
 
@@ -155,10 +196,10 @@ def cmd_doctor(cfg, args):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Grokbot paper trading bot")
+    ap = argparse.ArgumentParser(description="Blackhorse paper trading bot")
     ap.add_argument("command",
                     choices=["paper", "report", "learn", "live", "resume",
-                             "dashboard", "doctor", "analyst-test"])
+                             "dashboard", "doctor", "analyst-test", "testnet"])
     ap.add_argument("--once", action="store_true", help="run a single cycle")
     ap.add_argument("--cycles", type=int, default=None, help="run N cycles")
     ap.add_argument("--no-browser", action="store_true",
@@ -172,7 +213,8 @@ def main():
      "resume": lambda: cmd_resume(cfg, args),
      "dashboard": lambda: cmd_dashboard(cfg, args),
      "doctor": lambda: cmd_doctor(cfg, args),
-     "analyst-test": lambda: cmd_analyst_test(cfg, args)}[args.command]()
+     "analyst-test": lambda: cmd_analyst_test(cfg, args),
+     "testnet": lambda: cmd_testnet(cfg, args)}[args.command]()
 
 
 if __name__ == "__main__":

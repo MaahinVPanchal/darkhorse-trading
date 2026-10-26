@@ -7,7 +7,7 @@ Companion to README.md. Grounded in the research report from 26 Oct 2026
 
 This bot is already a small agent team. The communication pattern is a
 **blackboard**, not a chat group: every agent reads and writes to the shared
-SQLite journal (`grokbot.db`), and the loop orchestrates the order. That is
+SQLite journal (`blackhorse.db`), and the loop orchestrates the order. That is
 deliberate -- chat-style agent swarms mostly repeat each other's bias, and the
 fleet studies found on-chain LLM trading agents have **no directional edge**
 (41% vs 50% round-trip win rate for Hyperliquid agents).

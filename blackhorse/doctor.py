@@ -22,7 +22,7 @@ def check(name, ok, detail=""):
 
 
 def run(cfg):
-    print("Grokbot doctor -- pre-flight checks\n")
+    print("Blackhorse doctor -- pre-flight checks\n")
 
     v = sys.version_info
     check("python >= 3.10", v >= (3, 10), f"{v.major}.{v.minor}.{v.micro}")
@@ -90,6 +90,29 @@ def run(cfg):
 
     check("live trading locked off", not cfg["live"].get("enabled"),
           "live.enabled=false -- deliberate until paper results justify it")
+
+    t = cfg.get("testnet", {})
+    if not t.get("enabled"):
+        check("testnet adapter", True, "disabled (paper mode is the trainer)")
+    else:
+        import requests as _rq
+        try:
+            from hyperliquid.exchange import Exchange  # noqa: F401
+            sdk = "sdk installed"
+        except ImportError:
+            sdk = "SDK MISSING: pip install hyperliquid-python-sdk"
+        key = os.environ.get("BLACKHORSE_TESTNET_KEY")
+        t0 = time.time()
+        try:
+            r = _rq.post("https://api.hyperliquid-testnet.xyz/info",
+                         json={"type": "allMids"}, timeout=10)
+            net = f"reachable in {time.time() - t0:.2f}s"
+            ok_net = r.status_code == 200
+        except Exception as e:
+            net, ok_net = f"UNREACHABLE from this network ({e.__class__.__name__})", False
+        check("testnet network", ok_net, net)
+        check("testnet sdk + key", bool(sdk.startswith("sdk") and key),
+              f"{sdk}; key={'set' if key else 'MISSING (setx BLACKHORSE_TESTNET_KEY)'}")
 
     fails = sum(1 for _, ok, _ in RESULTS if not ok)
     print(f"\n{len(RESULTS) - fails}/{len(RESULTS)} checks passed."
