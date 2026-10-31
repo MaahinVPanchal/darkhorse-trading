@@ -37,15 +37,17 @@ qualified adviser. When that day comes, this is the path:
 2. **Buy USDC with INR** on a FIU-registered Indian exchange (e.g. CoinDCX,
    Mudrex, ZebPay — they require PAN/KYC). Withdraw the USDC on-chain
    (Arbitrum network) to your own wallet address.
-3. **Deposit to Hyperliquid** (app.hyperliquid.xyz, connect wallet). The old
-   bridge has a 5 USDC minimum; Hyperliquid charges ~$1 per withdrawal, which
-   on a $5 balance is 20% — factor that in.
-4. **Practice manually first** — place one tiny trade yourself and watch how
+3. **Connect with one signature**: run `darkhorse connect` — a local page
+   opens, click Connect MetaMask, approve the agent (one free signature).
+   The bot generates a trade-only agent key locally; your MetaMask key never
+   leaves MetaMask. (Old way: copy the key from Hyperliquid's API page into
+   connect_wallet.bat — still works as a fallback.)
+4. **Deposit to Hyperliquid** (app.hyperliquid.xyz). The old bridge has a
+   5 USDC minimum; Hyperliquid charges ~$1 per withdrawal — factor that in.
+5. **Practice manually first** — place one tiny trade yourself and watch how
    stop-loss, leverage and fees behave before any bot touches it.
-5. **Only then a bot API wallet**: Hyperliquid lets you create a separate
-   API wallet that can TRADE but CANNOT WITHDRAW. The bot only ever gets that
-   key — never your seed phrase. When we reach this step, the live adapter
-   gets built and tested on testnet first.
+
+Hard limits to remember: ~$10 minimum order size on Hyperliquid perps
 
 Hard limits to remember: ~$10 minimum order size on Hyperliquid perps
 (so the $10 start = one small position at a time), fees ~0.045% per fill,
