@@ -9,6 +9,7 @@ Point a browser at http://127.0.0.1:<port> -- `python run.py dashboard`
 opens it automatically. The page refreshes itself every N seconds.
 """
 
+import bisect
 import json
 import os
 import threading
@@ -30,6 +31,16 @@ def _mask(value):
     if not value:
         return None
     return value[:4] + "..." + value[-4:] if len(value) > 12 else "set"
+
+
+def _candles_map(cfg):
+    out = {}
+    for coin in cfg["symbols"]:
+        try:
+            out[coin] = market.candles(coin, cfg["timeframe"], 150)
+        except Exception:
+            pass
+    return out
 
 
 def _coin_pnl_series(journal):
@@ -116,6 +127,115 @@ def _svg_multicurve(series_dict):
     return "".join(parts)
 
 
+def _round_trips(journal):
+    """Pair buys/sells into closed round trips, oldest first."""
+    rows = journal.conn.execute(
+        "SELECT * FROM fills ORDER BY id ASC").fetchall()
+    open_map, trips = {}, []
+    for r in rows:
+        r = dict(r)
+        if r["side"] == "buy":
+            open_map.setdefault(r["coin"], []).append(r)
+        elif r["side"] == "sell":
+            queue = open_map.get(r["coin"])
+            if queue:
+                b = queue.pop(0)
+                trips.append({"coin": r["coin"], "entry_ts": b["ts"],
+                              "entry_px": b["price"], "exit_ts": r["ts"],
+                              "exit_px": r["price"], "pnl": r["pnl"],
+                              "kind": r["kind"]})
+    return trips
+
+
+def _iso_to_ms(ts):
+    try:
+        return datetime.fromisoformat(ts).timestamp() * 1000
+    except Exception:
+        return None
+
+
+def _svg_trade_chart(coin, candles, trips, position):
+    """Candlestick chart with entry/exit markers for every transaction."""
+    w, h, pad = 860, 240, 34
+    N = 120
+    candles = candles[-N:]
+    n = len(candles)
+    if n < 5:
+        return (f"<svg width='100%' height='{h}'><text x='20' y='60' "
+                f"fill='#8b949e'>{coin}: collecting candles...</text></svg>")
+    lo = min(c["low"] for c in candles)
+    hi = max(c["high"] for c in candles)
+    if position:
+        lo = min(lo, position["stop"], position["avg_price"])
+        hi = max(hi, position["target"], position["avg_price"])
+    span = (hi - lo) or 1.0
+
+    def y(price):
+        return h - pad - (price - lo) / span * (h - 2 * pad)
+
+    times = [c["t"] for c in candles]
+    step = (w - 2 * pad) / n
+    body_w = max(step * 0.62, 1.4)
+
+    parts = [f"<svg viewBox='0 0 {w} {h}' width='100%' height='{h}' "
+             f"preserveAspectRatio='none'>"]
+    if position:  # open position: entry line + stop/target zones
+        ey = y(position["avg_price"])
+        parts.append(f"<line x1='{pad}' y1='{ey:.1f}' x2='{w - pad}' "
+                     f"y2='{ey:.1f}' stroke='#58a6ff' stroke-dasharray='4 3' "
+                     f"stroke-width='1'/>")
+        parts.append(f"<text x='{pad + 4}' y='{ey - 4:.1f}' fill='#58a6ff' "
+                     f"font-size='11'>entry {position['avg_price']:.2f}</text>")
+        for lvl, col, name in ((position["target"], "#3fb950", "TP"),
+                               (position["stop"], "#f85149", "SL")):
+            ly = y(lvl)
+            parts.append(f"<line x1='{pad}' y1='{ly:.1f}' x2='{w - pad}' "
+                         f"y2='{ly:.1f}' stroke='{col}' "
+                         f"stroke-dasharray='2 4' stroke-width='1'/>")
+            parts.append(f"<text x='{w - pad - 70}' y='{ly - 4:.1f}' "
+                         f"fill='{col}' font-size='11'>{name} {lvl:.2f}</text>")
+
+    for i, c in enumerate(candles):
+        x = pad + i * step + step / 2
+        col = "#3fb950" if c["close"] >= c["open"] else "#f85149"
+        parts.append(f"<line x1='{x:.1f}' y1='{y(c['low']):.1f}' "
+                     f"x2='{x:.1f}' y2='{y(c['high']):.1f}' "
+                     f"stroke='{col}' stroke-width='1'/>")
+        yo, yc = y(c["open"]), y(c["close"])
+        top, hgt = min(yo, yc), max(abs(yo - yc), 1.0)
+        parts.append(f"<rect x='{x - body_w / 2:.1f}' y='{top:.1f}' "
+                     f"width='{body_w:.1f}' height='{hgt:.1f}' fill='{col}'/>")
+
+    def marker(ts_ms, price, kind, pnl):
+        i = bisect.bisect_left(times, ts_ms)
+        i = min(max(i - 1, 0), n - 1)
+        x = pad + i * step + step / 2
+        yp = y(price)
+        if kind == "entry":
+            parts.append(f"<polygon points='{x:.1f},{yp + 7:.1f} "
+                         f"{x - 5:.1f},{yp + 14:.1f} {x + 5:.1f},{yp + 14:.1f}' "
+                         f"fill='#58a6ff'/>")
+        else:
+            col = "#3fb950" if (pnl or 0) >= 0 else "#f85149"
+            parts.append(f"<circle cx='{x:.1f}' cy='{yp - 9:.1f}' r='4.5' "
+                         f"fill='{col}'/>")
+
+    for t in trips:
+        if t["coin"] != coin:
+            continue
+        ems, xms = _iso_to_ms(t["entry_ts"]), _iso_to_ms(t["exit_ts"])
+        if ems and times[0] - 3600e3 <= ems <= times[-1] + 3600e3:
+            marker(ems, t["entry_px"], "entry", None)
+        if xms and times[0] - 3600e3 <= xms <= times[-1] + 3600e3:
+            marker(xms, t["exit_px"], "exit", t["pnl"])
+
+    last = candles[-1]["close"]
+    parts.append(f"<text x='{w - pad - 90}' y='16' fill='#c9d1d9' "
+                 f"font-size='12'>{coin} last {last:.2f}</text>")
+    parts.append("</svg>")
+    return "".join(parts)
+
+
 def build_data(cfg, journal):
     prices = {}
     try:
@@ -141,7 +261,7 @@ def build_data(cfg, journal):
         fills.append({**f, "pnl": f["pnl"]})
     decisions = []
     for d in journal.conn.execute(
-            "SELECT * FROM decisions ORDER BY id DESC LIMIT 40"):
+            "SELECT * FROM decisions ORDER BY id DESC LIMIT 120"):
         decisions.append(dict(d))
     return {
         "version": VERSION,
@@ -154,6 +274,9 @@ def build_data(cfg, journal):
         "stats": stats, "positions": positions,
         "fees_paid": journal.total_fees(),
         "coin_pnl_series": _coin_pnl_series(journal),
+        "round_trips": _round_trips(journal),
+        "candles_map": _candles_map(cfg),
+        "all_fills": journal.fills(500),
         "fills": fills, "decisions": decisions,
         "analyst": {"enabled": cfg["analyst"].get("enabled", False),
                     "mode": cfg["analyst"].get("mode"), "provider": provider,
@@ -188,6 +311,8 @@ PAGE = """<!doctype html>
   .feed td{{white-space:normal}} .tag{{font-size:10px;padding:1px 6px;border-radius:8px}}
   .tag.code{{background:#1f6feb33;color:#58a6ff}} .tag.llm{{background:#8957e533;color:#d2a8ff}}
   .muted{{color:#8b949e}} .banner{{padding:10px 14px;border-radius:8px;margin:10px 0}}
+  .scroll{{max-height:360px;overflow-y:auto;border:1px solid #21262d;
+          border-radius:6px}}
   .halt{{background:#f8514922;border:1px solid #f85149;color:#f85149}}
 </style></head><body>
 <h1>BLACKHORSE <span class="muted">live paper desk</span></h1>
@@ -211,6 +336,19 @@ PAGE = """<!doctype html>
 <div style="flex:1;min-width:340px">
 {coin_section}
 
+<h2>trade map -- every transaction on the price chart</h2>
+{trade_map}
+
+<div class="row">
+<div style="flex:1;min-width:340px">
+<h2>closed trades ({n_trips})</h2>
+{trips_html}
+
+<h2>all transactions ({n_fills})</h2>
+{all_fills_html}
+</div>
+
+<div style="flex:1.2;min-width:380px">
 <h2>agent hive &mdash; who is connected, with what</h2>
 <table>
   <tr><th>agent</th><th>key / connection</th><th>power</th></tr>
@@ -324,6 +462,56 @@ def render(data, cfg):
     coin_curve = _svg_multicurve(data["coin_pnl_series"])
     coin_section = ("<h2>realized pnl by coin (cumulative, per closed trade)</h2>"
                     + coin_curve)
+
+    pos_by_coin = {p["coin"]: p for p in data["positions"]}
+    charts = []
+    for coin in cfg["symbols"]:
+        charts.append(f"<h3 style='margin:14px 0 2px;font-size:12px;color:#8b949e'>"
+                      f"{coin} -- {cfg['timeframe']} candles, markers = your "
+                      f"transactions</h3>")
+        charts.append(_svg_trade_chart(
+            coin, data["candles_map"].get(coin, []),
+            data["round_trips"], pos_by_coin.get(coin)))
+    trade_map = "".join(charts)
+
+    if data["all_fills"]:
+        frows = []
+        for f in data["all_fills"]:
+            pnl = (f"<span class='{'up' if f['pnl'] > 0 else 'down'}'>"
+                   f"{f['pnl']:+.4f}</span>") if f["pnl"] is not None else ""
+            frows.append(f"<tr><td>{f['ts'][:19]}</td><td>{f['coin']}</td>"
+                         f"<td>{f['side']}</td><td>{f['qty']:.6f} @ "
+                         f"{f['price']:.2f}</td><td>{f['notional']:.2f}</td>"
+                         f"<td>{f['fee']:.4f}</td><td>{f['kind']}</td>"
+                         f"<td>{pnl}</td></tr>")
+        all_fills_html = (
+            f"<div class='scroll'><table><tr><th>time (UTC)</th><th>coin</th>"
+            f"<th>side</th><th>fill</th><th>notional $</th><th>fee</th>"
+            f"<th>kind</th><th>pnl</th></tr>" + "".join(frows) +
+            f"</table></div><div class='muted'>{len(data['all_fills'])} "
+            f"transactions total -- every one journaled</div>")
+    else:
+        all_fills_html = "<p class='muted'>no transactions yet</p>"
+
+    trips = data["round_trips"]
+    if trips:
+        trows = []
+        for t in trips:
+            cls = "up" if t["pnl"] >= 0 else "down"
+            trows.append(
+                f"<tr><td>{t['entry_ts'][:16].replace('T', ' ')}</td>"
+                f"<td>{t['coin']}</td>"
+                f"<td>in ${t['entry_px']:.2f}</td>"
+                f"<td>{t['exit_ts'][:16].replace('T', ' ')}</td>"
+                f"<td>out ${t['exit_px']:.2f}</td>"
+                f"<td>{t['kind']}</td>"
+                f"<td class='{cls}'>{t['pnl']:+.4f}</td></tr>")
+        trips_html = ("<div class='scroll'><table><tr><th>entry</th><th>coin</th>"
+                      "<th>entry px</th><th>exit</th><th>exit px</th>"
+                      "<th>kind</th><th>pnl</th></tr>" + "".join(trows) +
+                      "</table></div>")
+    else:
+        trips_html = "<p class='muted'>no closed round trips yet</p>"
     halt_banner = ""
     if data["halted"]:
         halt_banner = f"<div class='banner halt'>HALTED: {data['halt_reason']} -- run resume.bat to re-enable</div>"
@@ -337,7 +525,9 @@ def render(data, cfg):
         exp_html=_fmt_pnl(s["expectancy"]), pf=pf,
         fees=f"${data['fees_paid']:.4f}",
         floor=f"${data['floor']:.2f}", curve=_svg_curve(hist, data["floor"]),
-        coin_section=coin_section,
+        coin_section=coin_section, trade_map=trade_map,
+        trips_html=trips_html, all_fills_html=all_fills_html,
+        n_trips=len(trips), n_fills=len(data["all_fills"]),
         a_provider=a["provider"] or "rules-only", a_key_line=key_line,
         a_power=a_power, a_calls=a["calls_today"],
         a_call_cap=a["call_cap"] or 0, a_toks=a["tokens_today"],
