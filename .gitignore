@@ -4,3 +4,4 @@ __pycache__/
 learned_proposals.json
 dashboard_test.log
 .env
+*.log
