@@ -30,11 +30,15 @@ def _ema_series(values, period):
     return out
 
 
-def _precompute(candles, ema_fast, ema_slow, rsi_max, vol_ratio_min):
+def _precompute(candles, engine, p1, p2, rsi_max, vol_ratio_min):
+    """Engine-aware indicator precompute, single O(n) pass per parameter.
+    trend: p1=ema_fast, p2=ema_slow. meanrev: p1=rsi_buy, p2=rsi_exit."""
     closes = [c["close"] for c in candles]
     vols = [c["volume"] for c in candles]
-    ef = _ema_series(closes, ema_fast)
-    es = _ema_series(closes, ema_slow)
+    ef = es = None
+    if engine == "trend":
+        ef = _ema_series(closes, p1)
+        es = _ema_series(closes, p2)
     # incremental RSI (Wilder), single pass
     r = [None] * len(closes)
     period = 14
@@ -55,6 +59,7 @@ def _precompute(candles, ema_fast, ema_slow, rsi_max, vol_ratio_min):
     for i in range(21, len(closes)):
         vr[i] = vols[i] / max(mean(vols[i - 20:i]), 1e-9)
     return {"closes": closes, "ef": ef, "es": es, "r": r, "vr": vr,
+            "engine": engine, "p1": p1, "p2": p2,
             "rsi_max": rsi_max, "vol_ratio_min": vol_ratio_min}
 
 
@@ -62,6 +67,7 @@ def _backtest(candles, ind, tp_pct, sl_pct, fee_bps, slip_bps):
     closes, ef, es, r, vr = (ind[k] for k in
                              ("closes", "ef", "es", "r", "vr"))
     rsi_max, vol_ratio_min = ind["rsi_max"], ind["vol_ratio_min"]
+    engine, p1, p2 = ind["engine"], ind["p1"], ind["p2"]
     trades = []
     pos = None
     for i in range(1, len(candles)):
@@ -72,7 +78,10 @@ def _backtest(candles, ind, tp_pct, sl_pct, fee_bps, slip_bps):
                 exit_price = stop
             elif candles[i]["high"] >= target:
                 exit_price = target
-            elif ef[i] is not None and es[i] is not None and ef[i] <= es[i]:
+            elif engine == "trend" and ef[i] is not None and es[i] is not None \
+                    and ef[i] <= es[i]:
+                exit_price = closes[i]
+            elif engine == "meanrev" and r[i] is not None and r[i] >= p2:
                 exit_price = closes[i]
             if exit_price is not None:
                 entry_eff = pos[2] * (1 + slip_bps / 1e4)
@@ -80,11 +89,18 @@ def _backtest(candles, ind, tp_pct, sl_pct, fee_bps, slip_bps):
                 gross = (exit_eff / entry_eff - 1) * 100
                 trades.append(gross - (fee_bps * 2) / 1e4 * 100)
                 pos = None
-        elif (ef[i] is not None and es[i] is not None
-              and ef[i - 1] is not None and es[i - 1] is not None
-              and ef[i] > es[i] and ef[i - 1] <= es[i - 1]
-              and r[i] is not None and r[i] < rsi_max
-              and vr[i] >= vol_ratio_min):
+        elif engine == "trend" and (
+                ef[i] is not None and es[i] is not None
+                and ef[i - 1] is not None and es[i - 1] is not None
+                and ef[i] > es[i] and ef[i - 1] <= es[i - 1]
+                and r[i] is not None and r[i] < rsi_max
+                and vr[i] >= vol_ratio_min):
+            pos = (i, closes[i] * (1 - sl_pct / 100),
+                   closes[i] * (1 + tp_pct / 100))
+        elif engine == "meanrev" and (
+                r[i] is not None and r[i - 1] is not None
+                and r[i - 1] >= p1 and r[i] < p1
+                and vr[i] >= vol_ratio_min):
             pos = (i, closes[i] * (1 - sl_pct / 100),
                    closes[i] * (1 + tp_pct / 100))
     return trades
@@ -107,6 +123,7 @@ def run(cfg, out_path="learned_proposals.json"):
     slip_bps = cfg["fees"]["slippage_bps"]
     learn = cfg["learn"]
     st = cfg["strategy"]
+    engines = learn.get("engines", ["trend"])
     proposals = []
     for coin in cfg["symbols"]:
         candles = market.candles(coin, cfg["timeframe"], learn["lookback_bars"])
@@ -115,11 +132,16 @@ def run(cfg, out_path="learned_proposals.json"):
             continue
         cut = int(len(candles) * 0.7)
         results = []
-        for f in learn["ema_fast_options"]:
-            for s in learn["ema_slow_options"]:
-                if f >= s:
-                    continue
-                ind = _precompute(candles, f, s, st["rsi_max"], st["vol_ratio_min"])
+        param_grids = {
+            "trend": [(f, s) for f in learn["ema_fast_options"]
+                      for s in learn["ema_slow_options"] if f < s],
+            "meanrev": [(b, x) for b in learn.get("rsi_buy_options", [30])
+                        for x in learn.get("rsi_exit_options", [55]) if b < x],
+        }
+        for engine in engines:
+            for p1, p2 in param_grids.get(engine, []):
+                ind = _precompute(candles, engine, p1, p2,
+                                  st["rsi_max"], st["vol_ratio_min"])
                 for tp in learn["tp_options"]:
                     for sl in learn["sl_options"]:
                         train = _stats(_backtest(
@@ -128,23 +150,31 @@ def run(cfg, out_path="learned_proposals.json"):
                             candles[cut:], ind, tp, sl, fee_bps, slip_bps))
                         if valid["trades"] < learn["min_trades_validate"]:
                             continue
-                        results.append({
-                            "coin": coin, "ema_fast": f, "ema_slow": s,
+                        row = {
+                            "coin": coin, "engine": engine,
                             "take_profit_pct": tp, "stop_loss_pct": sl,
                             "train": train, "validate": valid,
                             "score": valid["expectancy"] * valid["trades"],
-                        })
+                        }
+                        if engine == "trend":
+                            row.update({"ema_fast": p1, "ema_slow": p2})
+                        else:
+                            row.update({"rsi_buy": p1, "rsi_exit": p2})
+                        results.append(row)
         results.sort(key=lambda x: x["score"], reverse=True)
         top = results[:3]
         proposals.extend(top)
         if top:
             b = top[0]
-            print(f"  {coin}: best validation expectancy "
+            if b["engine"] == "trend":
+                ptxt = f"EMA {b['ema_fast']}/{b['ema_slow']}"
+            else:
+                ptxt = f"RSI buy<{b['rsi_buy']} exit>={b['rsi_exit']}"
+            print(f"  {coin}: best [{b['engine']}] validation expectancy "
                   f"{b['validate']['expectancy']:+.3f}%/trade over "
                   f"{b['validate']['trades']} trades "
                   f"(train {b['train']['expectancy']:+.3f}% over "
-                  f"{b['train']['trades']}) -> "
-                  f"EMA {b['ema_fast']}/{b['ema_slow']} "
+                  f"{b['train']['trades']}) -> {ptxt} "
                   f"TP {b['take_profit_pct']}% SL {b['stop_loss_pct']}%")
         else:
             print(f"  {coin}: no parameter set produced enough validation trades")

@@ -4,7 +4,7 @@
 
 import time
 
-from . import analyst, guards, market, risk, strategy
+from . import analyst, guards, market, notify, risk, strategy
 from .paper import PaperBroker
 
 
@@ -12,10 +12,15 @@ def run_cycle(journal, broker, cfg, use_analyst=True, verbose=True):
     prices = market.all_mids()
 
     # 0. account guards first: equity floor, halt latch
+    was_halted = guards.is_halted(journal)
     halted, floor, note = guards.enforce(journal, broker, cfg, prices)
     if halted:
         equity = broker.equity(prices)
         journal.record_equity(broker.cash(), broker.unrealized(prices), equity)
+        if not was_halted:
+            notify.send(f"BLACKHORSE HALTED (equity ${equity:.4f} <= floor "
+                        f"${floor:.2f}):\n{note}\n\n"
+                        f"Run resume.bat to re-enable (your call).")
         if verbose:
             print(f"[{time.strftime('%H:%M:%S')}] HALTED: {note} | "
                   f"equity ${equity:.4f} | floor ${floor:.2f} | "
@@ -74,6 +79,9 @@ def run_cycle(journal, broker, cfg, use_analyst=True, verbose=True):
     equity = broker.equity(prices)
     journal.record_equity(broker.cash(), broker.unrealized(prices), equity)
 
+    if actions:
+        notify.send(notify.fills_message(actions, equity), silent=True)
+
     if verbose:
         n_pos = len(journal.all_positions())
         print(f"[{time.strftime('%H:%M:%S')}] equity ${equity:.4f} | "
@@ -96,5 +104,5 @@ def run(journal, broker, cfg, cycles=None, use_analyst=True):
         except Exception as e:
             print(f"cycle error (will retry): {e}")
         i += 1
-        if cycles is None:
+        if cycles is None or i < cycles:
             time.sleep(cfg["cycle_seconds"])

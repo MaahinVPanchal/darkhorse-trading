@@ -37,6 +37,14 @@ def rsi(closes, period=14):
 
 
 def evaluate(candles, params):
+    """Dispatch on the configured engine. Default: trend (original behavior)."""
+    engine = params.get("engine", "trend")
+    if engine == "meanrev":
+        return _eval_meanrev(candles, params)
+    return _eval_trend(candles, params)
+
+
+def _eval_trend(candles, params):
     """Return {action: enter|exit|wait, reason, indicators...} for the latest bar."""
     closes = [c["close"] for c in candles]
     vols = [c["volume"] for c in candles]
@@ -76,5 +84,50 @@ def evaluate(candles, params):
         "ema_fast": fast,
         "ema_slow": slow,
         "rsi": r,
+        "vol_ratio": vol_ratio,
+    }
+
+
+def _eval_meanrev(candles, params):
+    """RSI mean-reversion engine (Freqtrade/Jesse convention, kept inspectable).
+
+    Enter when RSI(14) crosses DOWN through rsi_buy (oversold dip, confirmed by
+    a volume spike). Exit when RSI recovers above rsi_exit. TP/SL still bound
+    every position from the exits config.
+    """
+    closes = [c["close"] for c in candles]
+    vols = [c["volume"] for c in candles]
+
+    r = rsi(closes)
+    prev_r = rsi(closes[:-1])
+    if r is None or prev_r is None:
+        return {"action": "wait", "reason": "not enough history"}
+
+    vol_ratio = 1.0
+    if len(vols) >= 22:
+        vol_ratio = vols[-1] / max(mean(vols[-21:-1]), 1e-9)
+
+    rsi_buy = params.get("rsi_buy", 30)
+    rsi_exit = params.get("rsi_exit", 55)
+    fresh_dip = prev_r >= rsi_buy and r < rsi_buy
+    filters_ok = vol_ratio >= params.get("vol_ratio_min", 1.1)
+
+    if fresh_dip and filters_ok:
+        action = "enter"
+        reason = f"RSI dipped to {r:.0f} (< {rsi_buy}), vol x{vol_ratio:.1f} -- oversold entry"
+    elif r >= rsi_exit:
+        action = "exit"
+        reason = f"RSI recovered to {r:.0f} (>= {rsi_exit})"
+    else:
+        action = "wait"
+        reason = (f"RSI {r:.0f} (buy<{rsi_buy}, exit>={rsi_exit}), "
+                  f"vol x{vol_ratio:.1f}, dip={fresh_dip}")
+
+    return {
+        "action": action,
+        "reason": reason,
+        "rsi": r,
+        "rsi_buy": rsi_buy,
+        "rsi_exit": rsi_exit,
         "vol_ratio": vol_ratio,
     }

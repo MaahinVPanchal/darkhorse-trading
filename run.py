@@ -256,6 +256,13 @@ def cmd_account(cfg, args):
           "(env var, never chat, never git).")
 
 
+def cmd_notify_test(cfg, args):
+    from blackhorse import notify
+    ok, msg = notify.test()
+    print(("OK: " if ok else "FAILED: ") + msg)
+    sys.exit(0 if ok else 1)
+
+
 def cmd_dashboard(cfg, args):
     dashboard.serve(cfg, open_browser=not args.no_browser)
 
@@ -270,7 +277,7 @@ def main():
     ap.add_argument("command",
                     choices=["paper", "report", "learn", "live", "resume",
                              "dashboard", "doctor", "analyst-test", "testnet",
-                             "account"])
+                             "account", "notify-test"])
     ap.add_argument("--address", default=None,
                     help="account: read-only lookup of this 0x address")
     ap.add_argument("--once", action="store_true", help="run a single cycle")
@@ -288,7 +295,8 @@ def main():
      "doctor": lambda: cmd_doctor(cfg, args),
      "analyst-test": lambda: cmd_analyst_test(cfg, args),
      "testnet": lambda: cmd_testnet(cfg, args),
-     "account": lambda: cmd_account(cfg, args)}[args.command]()
+     "account": lambda: cmd_account(cfg, args),
+     "notify-test": lambda: cmd_notify_test(cfg, args)}[args.command]()
 
 
 if __name__ == "__main__":

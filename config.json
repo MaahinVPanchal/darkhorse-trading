@@ -9,10 +9,13 @@
   "fees": { "taker_bps": 4.5, "slippage_bps": 5.0 },
 
   "strategy": {
+    "engine": "trend",
     "ema_fast": 9,
     "ema_slow": 21,
     "rsi_max": 72,
-    "vol_ratio_min": 1.1
+    "vol_ratio_min": 1.1,
+    "rsi_buy": 30,
+    "rsi_exit": 55
   },
 
   "exits": { "take_profit_pct": 1.5, "stop_loss_pct": 1.0 },
@@ -56,8 +59,11 @@
 
   "learn": {
     "lookback_bars": 1500,
+    "engines": ["trend", "meanrev"],
     "ema_fast_options": [5, 8, 9, 12, 16],
     "ema_slow_options": [21, 26, 34, 48],
+    "rsi_buy_options": [20, 25, 30],
+    "rsi_exit_options": [45, 55, 65],
     "tp_options": [1.0, 1.5, 2.5],
     "sl_options": [0.7, 1.0, 1.5],
     "min_trades_validate": 8

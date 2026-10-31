@@ -63,6 +63,7 @@ pip install -r requirements.txt   # requests + hyperliquid sdk — that's all
 | 🩺 `doctor.bat` | pre-flight: python, API, config, DB, keys, ports, testnet |
 | 🔑 `connect_wallet.bat` | **one-time**: paste your testnet API key (hidden prompt) → auto-saves, verifies, shows balances |
 | 🤖 `analyst_test.bat` | fires **one real call** at Jev/Nebius — proves your AI key works |
+| 📲 `notify_test.bat` | sends one real Telegram message — proves your alert wiring |
 | 🧪 `testnet.bat` | **real signed orders, mock money** on Hyperliquid testnet |
 | 🔓 `resume.bat` | re-enable trading after the equity-floor halt |
 
@@ -104,7 +105,15 @@ this repo, never in a file:
 setx TYPESAFE_API_KEY "jev-key"        :: your $5 Jev credit (~119B input tokens — effectively unlimited)
 setx NEBIUS_API_KEY "nebius-key"       :: fallback, OpenAI-compatible
 setx BLACKHORSE_TESTNET_KEY "0x..."    :: testnet API-wallet key (trade-only, CANNOT withdraw)
+setx TELEGRAM_BOT_TOKEN "..."          :: optional: phone alerts on every fill + halt
+setx TELEGRAM_CHAT_ID "..."            :: optional: your chat id (see below)
 ```
+
+**Telegram alerts (5 min, optional):** talk to **@BotFather** → `/newbot` → copy
+the token → send any message to your new bot → open
+`https://api.telegram.org/bot<TOKEN>/getUpdates` → copy the `chat.id` →
+`setx` both vars → reopen terminals → `notify_test.bat` sends you a real
+message. After that, every entry/exit/halt lands on your phone automatically.
 
 Then reopen terminals → verify with `analyst_test.bat` → set `"analyst": {"enabled": true}`
 in `config.json`. Daily AI budget (default **200 calls / 200k input tokens**) is
@@ -156,6 +165,10 @@ posts hide.
 | [jev-trader](https://github.com/jarrodwatts/jev-trader) (~3.1k★) | Jev decides every Monad block (~300ms), post-only limit orders | `TYPESAFE_AI_API_KEY` env var; MockModel fallback | **Dry-run by default** |
 | [Freqtrade](https://github.com/freqtrade/freqtrade) | The granddad of open-source bots (Python, web UI, plotting) | No LLM natively | **Dry-run mode** is the classic pattern |
 | [beebots](https://github.com/imikerussell/beebots) | Three AI bees on OKX; decisions by Jev; paper by default | Jev/Gemini via env keys; model stateless, never sees the order endpoint | **Paper by default**; live needs explicit ACK |
+| [virattt/ai-hedge-fund](https://github.com/virattt/ai-hedge-fund) (~70k★) | AI hedge-fund team: analyst agents run structured bull-vs-bear debates; legendary-investor personas | Any provider via env keys; agent reports feed a risk check | **Research/simulation only** — cannot place trades |
+| [Hummingbot](https://github.com/hummingbot/hummingbot) (~10k★) | Market-making framework across CEXs/DEXes | No LLM — config-driven strategies, order lifecycle management, dead-man's switch | Live-capable; complex by design |
+| [Jesse](https://jesse.trade) (~5k★) | Strategy research & backtesting framework, clean Python API | No LLM | Backtest/paper focus |
+| [OctoBot](https://github.com/Drakkar-Software/OctoBot) | User-friendly bot with AI/ML integrations | Pluggable AI/ML evaluators | Paper/trading modes |
 
 **What Blackhorse took from each** (and where it lives):
 
@@ -200,14 +213,15 @@ config.json             every knob: symbols, risk caps, floor, fees, analyst pro
 connect_wallet.py/.bat  one-time: hidden key prompt -> setx -> verify -> balances
 grokbot→blackhorse/
   market.py             Hyperliquid public data (no keys to read)
-  strategy.py           EMA cross + RSI + volume, closed candles only
+  strategy.py           TWO engines: EMA trend cross + RSI mean-reversion (config picks)
   risk.py               veto layer: caps, loss limit, cooldown
   paper.py              simulated broker: 4.5 bps fee + 5 bps slippage
   testnet_broker.py     real signed orders via official SDK (testnet)
   journal.py            SQLite blackboard: fills, positions, decisions, equity, state
   guards.py             $5 equity floor -> flatten + halt latch
   analyst.py            Jev (/v1/systemone Choice+Noul) + Nebius/Grok/OpenRouter/ZAI
-  learn.py              walk-forward grid search -> proposals
+  notify.py             Telegram push: every fill + halt, to your phone
+  learn.py              walk-forward grid search, RACES trend vs meanrev engines
   loop.py               guard -> TP/SL -> signal -> analyst gate -> risk -> fill
   dashboard.py          localhost UI (stdlib, SVG curve)
   doctor.py             pre-flight checks
