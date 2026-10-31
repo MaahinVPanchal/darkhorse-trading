@@ -8,7 +8,7 @@
 [![Status](https://img.shields.io/badge/stage-paper--trading-yellow?style=flat-square)](#-the-ladder-paper--testnet--mainnet)
 [![Dependencies](https://img.shields.io/badge/deps-2-success?style=flat-square)](requirements.txt)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
-[![Live AI](https://img.shields.io/badge/LLM-Jev%20%7C%20Nebius%20%7C%20Grok-8957E5?style=flat-square)](#-where-keys-go-and-where-they-never-go)
+[![Live AI](https://img.shields.io/badge/AI-15%20providers%20%7C%20Jev%20%2B%20gpt--6--luna%20decisions-8957E5?style=flat-square)](#-where-keys-go-and-where-they-never-go)
 
 **Paper-trades crypto against live Hyperliquid prices • localhost dashboard • AI veto layer • walk-forward learning**
 
@@ -17,6 +17,15 @@
 <img src="docs/dashboard.png" alt="Blackhorse live dashboard: stat cards, equity curve with the $5 floor as a red line, agent hive, decision feed with CODE vs CODE+LLM tags" width="100%">
 
 </div>
+
+> *"What I cannot create, I do not understand."* — Richard Feynman
+>
+> This repo is that idea applied to trading: **build your own AI trading desk
+> from scratch** — the order signing, the risk engine, the walk-forward
+> statistics, the LLM orchestration — and you will finally understand why most
+> Hyperliquid wallets lose, why viral screenshots lie, and what your own edge
+> actually is. You cannot learn that from a paid course. You learn it here, in
+> public, with receipts.
 
 ---
 
@@ -30,6 +39,7 @@
 - [The Ladder](#-the-ladder-paper--testnet--mainnet)
 - [How it learns](#-how-it-learns-honestly)
 - [Repo comparison](#-how-it-compares-to-the-public-repos)
+- [Contributing](#-contributing-build-this-with-us)
 - [Honest numbers](#-honest-numbers)
 - [India note](#-india-note)
 
@@ -190,6 +200,22 @@ posts hide.
 - TradingAgents → memory-then-reflection loop, **not** agent debate *(journal.py, learn.py)*
 - chainstack → testnet-default + validate-before-run *(config gates, doctor.py)*
 - Freqtrade → dry-run classic with honest fee/slippage modeling *(paper.py: 4.5 bps + 5 bps)*
+
+## 🤝 Contributing — build this with us
+
+This is an **open, learn-by-building project** in the spirit of
+[codecrafters-io/build-your-own-x](https://github.com/codecrafters-io/build-your-own-x)
+(558k★: *"What I cannot create, I do not understand"*). The difference: instead
+of rebuilding Redis, you rebuild a trading desk — and your findings get
+published, failures included.
+
+**First tasks are scoped and waiting in [CONTRIBUTING.md](CONTRIBUTING.md):**
+a funding-rate filter, an orderbook-imbalance filter, a regime classifier,
+new decision-layer providers, new strategy engines, dashboard upgrades.
+Every strategy claim needs walk-forward numbers; every PR keeps the AI
+veto-only rule intact.
+
+**The one rule:** the AI may veto, never execute. Risk lives in code.
 
 ## 📉 Honest numbers
 
