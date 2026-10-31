@@ -256,6 +256,62 @@ def cmd_account(cfg, args):
           "(env var, never chat, never git).")
 
 
+def cmd_reconcile(cfg, args):
+    """NautilusTrader-style reconciliation: journal vs venue, READ-ONLY."""
+    address = args.address
+    key = os.environ.get("BLACKHORSE_TESTNET_KEY")
+    if not address and key:
+        try:
+            from eth_account import Account
+            address = Account.from_key(key).address
+        except Exception:
+            pass
+    if not address:
+        print("Usage: python run.py reconcile --address 0x...")
+        sys.exit(1)
+    journal = Journal()
+    jpos = {}
+    for p in journal.all_positions():
+        jpos[p["coin"]] = jpos.get(p["coin"], 0.0) + p["qty"]
+
+    any_venue = False
+    for label, base in (("TESTNET", TESTNET_URL), ("MAINNET", MAINNET_URL)):
+        try:
+            r = requests.post(f"{base}/info", json={
+                "type": "clearinghouseState", "user": address, "dex": ""},
+                timeout=12)
+            r.raise_for_status()
+            st = r.json()
+        except Exception as e:
+            print(f"[{label}] unreachable ({e.__class__.__name__})")
+            continue
+        any_venue = True
+        xpos = {}
+        for p in st.get("assetPositions", []):
+            pi = p["position"]
+            xpos[pi["coin"]] = xpos.get(pi["coin"], 0.0) + float(pi["szi"])
+        print(f"\n[{label}] reconciliation for {address}")
+        print(f"  account value: ${float(st.get('marginSummary', {}).get('accountValue', 0)):.2f}")
+        coins = sorted(set(jpos) | set(xpos))
+        if not coins:
+            print("  no positions on either side -- trivially PASS")
+            continue
+        ok = True
+        for coin in coins:
+            j, x = jpos.get(coin, 0.0), xpos.get(coin, 0.0)
+            match = abs(j - x) < 1e-9
+            ok = ok and match
+            tag = "PASS" if match else "MISMATCH"
+            print(f"  {coin:<6} journal {j:+.6f} | venue {x:+.6f}  [{tag}]")
+        if jpos and not xpos and label == "MAINNET":
+            print("  (expected: paper positions never exist on the exchange)")
+        print(f"  reconciliation: {'PASS' if ok else 'MISMATCH -- investigate'}")
+    if not any_venue:
+        print("\nNo venue reachable -- reconciliation impossible right now.")
+    print("\nNote: paper-journal positions are simulated by design; use this "
+          "command against TESTNET once the API key is connected.")
+
+
 def cmd_notify_test(cfg, args):
     from blackhorse import notify
     ok, msg = notify.test()
@@ -277,7 +333,7 @@ def main():
     ap.add_argument("command",
                     choices=["paper", "report", "learn", "live", "resume",
                              "dashboard", "doctor", "analyst-test", "testnet",
-                             "account", "notify-test"])
+                             "account", "notify-test", "reconcile"])
     ap.add_argument("--address", default=None,
                     help="account: read-only lookup of this 0x address")
     ap.add_argument("--once", action="store_true", help="run a single cycle")
@@ -296,7 +352,8 @@ def main():
      "analyst-test": lambda: cmd_analyst_test(cfg, args),
      "testnet": lambda: cmd_testnet(cfg, args),
      "account": lambda: cmd_account(cfg, args),
-     "notify-test": lambda: cmd_notify_test(cfg, args)}[args.command]()
+     "notify-test": lambda: cmd_notify_test(cfg, args),
+     "reconcile": lambda: cmd_reconcile(cfg, args)}[args.command]()
 
 
 if __name__ == "__main__":

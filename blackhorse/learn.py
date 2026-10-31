@@ -131,6 +131,9 @@ def run(cfg, out_path="learned_proposals.json"):
             print(f"  {coin}: only {len(candles)} candles, skipping")
             continue
         cut = int(len(candles) * 0.7)
+        # NexusTrade-style embargo: skip bars between train and validation so
+        # indicator warm-up (EMA seeds, RSI window) can't leak across the split
+        embargo = learn.get("embargo_bars", 20)
         results = []
         param_grids = {
             "trend": [(f, s) for f in learn["ema_fast_options"]
@@ -147,7 +150,7 @@ def run(cfg, out_path="learned_proposals.json"):
                         train = _stats(_backtest(
                             candles[:cut], ind, tp, sl, fee_bps, slip_bps))
                         valid = _stats(_backtest(
-                            candles[cut:], ind, tp, sl, fee_bps, slip_bps))
+                            candles[cut + embargo:], ind, tp, sl, fee_bps, slip_bps))
                         if valid["trades"] < learn["min_trades_validate"]:
                             continue
                         row = {
