@@ -183,44 +183,17 @@ posts hide.
 
 ## 🧪 How it compares to the public repos
 
-| Repo | What it is | How the LLM connects | Real or paper? |
-|---|---|---|---|
-| [TradingAgents](https://github.com/tauricresearch/tradingagents) (~80k★) | Simulated trading firm on LangGraph: fundamentals/sentiment/news/technical analysts → bull-vs-bear researcher debate → trader → risk team → portfolio manager | Any provider via env keys (OpenAI, Grok, DeepSeek, Gemini, OpenRouter, local Ollama); two tiers — `quick_think_llm` for analysts, `deep_think_llm` for managers | **Paper only** — simulated exchange, no real execution |
-| [AI-Trader](https://github.com/HKUDS/AI-Trader) (~23k★, HKU) | Agent-native platform: AI agents publish signals, copy each other; FastAPI + React, leaderboards | Agents self-register via a SKILL.md URL (OpenClaw, Claude Code, Cursor…) | **Paper** ($100K simulated); real money only via your own broker signal-sync |
-| [chainstacklabs/hyperliquid-trading-bot](https://github.com/chainstacklabs/hyperliquid-trading-bot) | Grid-trading bot for Hyperliquid (YAML strategies, conservative BTC grid) | No LLM — but the exchange wiring is the reference: private key in `.env`, testnet default, `--validate` check, WebSocket data | **Testnet by default**, mainnet only if you flip it |
-| [hypergrok-trading-desk](https://github.com/galleonlabs/hypergrok-trading-desk) | 7-role trading desk on Hyperliquid (SKILL.md; works with Grok Bot/Claude) | Keyless public reads; execution only via a trade-only API wallet | **Testnet first**, then mainnet |
-| [jev-trader](https://github.com/jarrodwatts/jev-trader) (~3.1k★) | Jev decides every Monad block (~300ms), post-only limit orders | `TYPESAFE_AI_API_KEY` env var; MockModel fallback | **Dry-run by default** |
-| [Freqtrade](https://github.com/freqtrade/freqtrade) | The granddad of open-source bots (Python, web UI, plotting) | No LLM natively | **Dry-run mode** is the classic pattern |
-| [beebots](https://github.com/imikerussell/beebots) | Three AI bees on OKX; decisions by Jev; paper by default | Jev/Gemini via env keys; model stateless, never sees the order endpoint | **Paper by default**; live needs explicit ACK |
-| [virattt/ai-hedge-fund](https://github.com/virattt/ai-hedge-fund) (~70k★) | AI hedge-fund team: analyst agents run structured bull-vs-bear debates; legendary-investor personas | Any provider via env keys; agent reports feed a risk check | **Research/simulation only** — cannot place trades |
-| [Hummingbot](https://github.com/hummingbot/hummingbot) (~10k★) | Market-making framework across CEXs/DEXes | No LLM — config-driven strategies, order lifecycle management, dead-man's switch | Live-capable; complex by design |
-| [Jesse](https://jesse.trade) (~5k★) | Strategy research & backtesting framework, clean Python API | No LLM | Backtest/paper focus |
-| [OctoBot](https://github.com/Drakkar-Software/OctoBot) | User-friendly bot with AI/ML integrations | Pluggable AI/ML evaluators | Paper/trading modes |
+Blackhorse borrows deliberately, not accidentally. From beebots: the model
+never sees the order endpoint, the live ACK gate, `CODE` vs `CODE+LLM`
+decision tags, code fallback when the AI is over budget. From hypergrok: the
+pre-flight doctor and keyless reads. From Freqtrade/chainstack: dry-run-first
+with honest fee + slippage modeling and testnet defaults. From TradingAgents:
+the journal-then-reflect loop — but **not** agent debates, because six agents
+repeating one thesis are not six independent checks.
 
-**What Darkhorse took from each** (and where it lives):
-
-- beebots → model never sees the order endpoint · live ACK string · `CODE`/`CODE+LLM` tags · code fallback on budget/latency *(analyst.py, run.py, dashboard.py)*
-- hypergrok → pre-flight `doctor` · one-writer execution · keyless reads *(doctor.py, market.py)*
-- jev-trader → Jev Choice/Noul veto questions · dry-run-first *(analyst.py, paper.py)*
-- TradingAgents → memory-then-reflection loop, **not** agent debate *(journal.py, learn.py)*
-- chainstack → testnet-default + validate-before-run *(config gates, doctor.py)*
-- Freqtrade → dry-run classic with honest fee/slippage modeling *(paper.py: 4.5 bps + 5 bps)*
-
-## 🤝 Contributing — build this with us
-
-This is an **open, learn-by-building project** in the spirit of
-[codecrafters-io/build-your-own-x](https://github.com/codecrafters-io/build-your-own-x)
-(558k★: *"What I cannot create, I do not understand"*). The difference: instead
-of rebuilding Redis, you rebuild a trading desk — and your findings get
-published, failures included.
-
-**First tasks are scoped and waiting in [CONTRIBUTING.md](CONTRIBUTING.md):**
-a funding-rate filter, an orderbook-imbalance filter, a regime classifier,
-new decision-layer providers, new strategy engines, dashboard upgrades.
-Every strategy claim needs walk-forward numbers; every PR keeps the AI
-veto-only rule intact.
-
-**The one rule:** the AI may veto, never execute. Risk lives in code.
+Full 11-repo comparison table (TradingAgents, AI-Trader, beebots,
+ai-hedge-fund, Hummingbot, Jesse, Freqtrade and more), with what each taught
+us: **[REPOS_COMPARED.md](REPOS_COMPARED.md)**
 
 ## 📉 Honest numbers
 
