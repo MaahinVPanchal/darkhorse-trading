@@ -16,7 +16,7 @@ import threading
 import webbrowser
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from . import analyst, guards, market
 from .journal import Journal
@@ -33,11 +33,12 @@ def _mask(value):
     return value[:4] + "..." + value[-4:] if len(value) > 12 else "set"
 
 
-def _candles_map(cfg):
+def _candles_map(cfg, view=None):
+    tf = (view or {}).get("tf") or cfg["timeframe"]
     out = {}
     for coin in cfg["symbols"]:
         try:
-            out[coin] = market.candles(coin, cfg["timeframe"], 150)
+            out[coin] = market.candles(coin, tf, 150)
         except Exception:
             pass
     return out
@@ -236,7 +237,7 @@ def _svg_trade_chart(coin, candles, trips, position):
     return "".join(parts)
 
 
-def build_data(cfg, journal):
+def build_data(cfg, journal, view=None):
     prices = {}
     try:
         prices = market.all_mids()
@@ -275,7 +276,7 @@ def build_data(cfg, journal):
         "fees_paid": journal.total_fees(),
         "coin_pnl_series": _coin_pnl_series(journal),
         "round_trips": _round_trips(journal),
-        "candles_map": _candles_map(cfg),
+        "candles_map": _candles_map(cfg, view),
         "all_fills": journal.fills(500),
         "fills": fills, "decisions": decisions,
         "analyst": {"enabled": cfg["analyst"].get("enabled", False),
@@ -293,30 +294,54 @@ def build_data(cfg, journal):
 
 PAGE = """<!doctype html>
 <html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Darkhorse - live paper desk</title>
 <meta http-equiv="refresh" content="{refresh}">
 <style>
-  body{{background:#0d1117;color:#c9d1d9;font-family:Consolas,'Courier New',monospace;
+  :root{{--bg:#0d1117;--fg:#c9d1d9;--card:#161b22;--border:#21262d;
+        --muted:#8b949e;--up:#3fb950;--down:#f85149;--warn:#d29922;
+        --accent:#58a6ff}}
+  body.light{{--bg:#f6f8fa;--fg:#1f2328;--card:#ffffff;--border:#d0d7de;
+             --muted:#57606a;--up:#1a7f37;--down:#cf222e;--warn:#9a6700;
+             --accent:#0969da}}
+  body{{background:var(--bg);color:var(--fg);font-family:Consolas,'Courier New',monospace;
        margin:0;padding:18px;}}
-  h1{{font-size:20px;margin:0 0 4px}} h2{{font-size:14px;color:#58a6ff;margin:22px 0 8px;
-     border-bottom:1px solid #21262d;padding-bottom:4px}}
+  h1{{font-size:20px;margin:0 0 4px}} h2{{font-size:14px;color:var(--accent);margin:22px 0 8px;
+     border-bottom:1px solid var(--border);padding-bottom:4px}}
   .row{{display:flex;gap:14px;flex-wrap:wrap}}
-  .card{{background:#161b22;border:1px solid #21262d;border-radius:8px;
+  .card{{background:var(--card);border:1px solid var(--border);border-radius:8px;
         padding:10px 14px;min-width:130px}}
+  .pill{{display:inline-block;padding:2px 10px;margin:0 4px 4px 0;border-radius:12px;
+        border:1px solid var(--border);color:var(--muted);text-decoration:none;
+        font-size:11px}}
+  .pill.on{{background:var(--accent);border-color:var(--accent);color:#fff}}
+  .gauge{{background:var(--border);border-radius:6px;height:9px;width:100%;
+         overflow:hidden;margin:3px 0 7px}}
+  .gauge .fill{{background:var(--accent);height:9px}}
+  .gauge .fill.hot{{background:var(--down)}}
+  .panel{{background:var(--card);border:1px solid var(--border);border-radius:8px;
+         padding:10px 14px;font-size:12px;white-space:pre-wrap}}
+  .stale-old{{color:var(--down)}} .stale-fresh{{color:var(--up)}}
+  .chartbox{{background:#0d1117;border-radius:8px;padding:6px}}
+  body.light .chartbox{{background:#0d1117}}
   .card .k{{font-size:11px;color:#8b949e}} .card .v{{font-size:18px;margin-top:2px}}
   .up{{color:#3fb950}} .down{{color:#f85149}} .warn{{color:#d29922}}
   table{{border-collapse:collapse;width:100%;font-size:12px}}
-  td,th{{border-bottom:1px solid #21262d;padding:4px 8px;text-align:left;white-space:normal}}
+  td,th{{border-bottom:1px solid var(--border);padding:4px 8px;text-align:left;white-space:normal}}
   th{{color:#8b949e;font-weight:normal}}
   .feed td{{white-space:normal}} .tag{{font-size:10px;padding:1px 6px;border-radius:8px}}
   .tag.code{{background:#1f6feb33;color:#58a6ff}} .tag.llm{{background:#8957e533;color:#d2a8ff}}
   .muted{{color:#8b949e}} .banner{{padding:10px 14px;border-radius:8px;margin:10px 0}}
-  .scroll{{max-height:360px;overflow-y:auto;border:1px solid #21262d;
+  .scroll{{max-height:360px;overflow-y:auto;border:1px solid var(--border);
           border-radius:6px}}
+  footer{{margin-top:26px;color:var(--muted);font-size:11px;
+         border-top:1px solid var(--border);padding-top:8px}}
   .halt{{background:#f8514922;border:1px solid #f85149;color:#f85149}}
-</style></head><body>
+</style></head><body class="{body_class}">
 <h1>DARKHORSE <span class="muted">live paper desk</span></h1>
-<div class="muted">updated {ts} &middot; refreshes every {refresh}s &middot; v{version}</div>
+<div class="muted">updated {ts} &middot; refreshes every {refresh}s &middot; v{version} &middot;
+{staleness}</div>
+<div style="margin:10px 0 4px">{controls}</div>
 {halt_banner}
 <div class="row">
   <div class="card"><div class="k">EQUITY</div><div class="v">{eq_html}</div></div>
@@ -329,8 +354,13 @@ PAGE = """<!doctype html>
   <div class="card"><div class="k">EQUITY FLOOR</div><div class="v warn">{floor}</div></div>
 </div>
 
+<div class="row">{panel_row}</div>
+
+<h2>engine leaderboard -- best validation expectancy per engine (walk-forward)</h2>
+{leaderboard}
+
 <h2>equity curve</h2>
-{curve}
+<div class="chartbox">{curve}</div>
 
 <div class="row">
 <div style="flex:1;min-width:340px">
@@ -385,6 +415,11 @@ PAGE = """<!doctype html>
 </table>
 </div>
 </div>
+<footer>DARKHORSE v{version} &middot; stdlib-only dashboard (no JS/CDN) &middot;
+JSON API: <a href="/api/data" style="color:var(--accent)">/api/data</a> &middot;
+views: ?tf=1h &middot; ?coin=BTC &middot; ?theme=light &middot;
+<a href="/" style="color:var(--accent)">reset</a><br>
+Not financial advice. Perps can liquidate your account. We publish failures.</footer>
 </body></html>"""
 
 
@@ -396,7 +431,18 @@ def _fmt_pnl(v):
     return f"<span class='{cls}'>{'+' if v > 0 else '-'}${abs(v):.4f}</span>"
 
 
-def render(data, cfg):
+def _view_from(qs):
+    valid_tf = {"15m", "1h", "4h", "1d"}
+    tf = qs.get("tf", [None])[0]
+    return {"tf": tf if tf in valid_tf else None,
+            "coin": qs.get("coin", [None])[0],
+            "theme": qs.get("theme", [None])[0]}
+
+
+def render(data, cfg, view=None, journal=None):
+    view = view or {}
+    cur_coin = view.get("coin")
+    cur_tf = view.get("tf") or cfg["timeframe"]
     hist = data["history"]
     if len(hist) >= 2:
         dd = max((max(x["total"] for x in hist[:i + 1]) - hist[i]["total"])
@@ -464,8 +510,9 @@ def render(data, cfg):
                     + coin_curve)
 
     pos_by_coin = {p["coin"]: p for p in data["positions"]}
+    map_coins = [cur_coin] if cur_coin in cfg["symbols"] else cfg["symbols"]
     charts = []
-    for coin in cfg["symbols"]:
+    for coin in map_coins:
         charts.append(f"<h3 style='margin:14px 0 2px;font-size:12px;color:#8b949e'>"
                       f"{coin} -- {cfg['timeframe']} candles, markers = your "
                       f"transactions</h3>")
@@ -516,6 +563,135 @@ def render(data, cfg):
     if data["halted"]:
         halt_banner = f"<div class='banner halt'>HALTED: {data['halt_reason']} -- run resume.bat to re-enable</div>"
     pf = f"{s['profit_factor']:.2f}" if s["profit_factor"] else "&mdash;"
+
+    # -- view: timeframe / coin / theme -----------------------------------
+    view = view or {}
+    cur_tf = view.get("tf") or cfg["timeframe"]
+    cur_coin = view.get("coin")
+    body_class = "light" if view.get("theme") == "light" else ""
+
+    def qurl(**kw):
+        q = {"tf": cur_tf, "coin": cur_coin or "all",
+             "theme": view.get("theme") or "dark"}
+        q.update(kw)
+        return "/?" + "&".join(f"{k}={v}" for k, v in q.items())
+
+    tf_pills = "".join(
+        f"<a class='pill {'on' if t == cur_tf else ''}' href='{qurl(tf=t)}'>{t}</a>"
+        for t in ("15m", "1h", "4h", "1d"))
+    coin_pills = "".join(
+        f"<a class='pill {'on' if (cur_coin or 'all') == c else ''}' "
+        f"href='{qurl(coin=c)}'>{c}</a>"
+        for c in ["all"] + cfg["symbols"])
+    theme_pills = ("<a class='pill' href='" + qurl(theme="dark") + "'>dark</a>"
+                   "<a class='pill' href='" + qurl(theme="light") + "'>light</a>")
+    controls = ("<span class='muted'>timeframe:</span> " + tf_pills + " "
+                "<span class='muted'>coin:</span> " + coin_pills + " "
+                "<span class='muted'>theme:</span> " + theme_pills)
+
+    # -- staleness: how old is the latest decision? ------------------------
+    dec = data["decisions"][0]["ts"] if data["decisions"] else None
+    if dec:
+        age_min = (datetime.now(timezone.utc)
+                   - datetime.fromisoformat(dec)).total_seconds() / 60.0
+        stale = (f"<span class='stale-{'old' if age_min > 30 else 'fresh'}'>"
+                 f"last decision {age_min:.0f} min ago"
+                 + (" -- BOT QUIET?" if age_min > 30 else "") + "</span>")
+    else:
+        stale = "<span class='stale-old'>no decisions logged yet</span>"
+
+    # -- ladder-readiness panel (promotion criteria, live) -----------------
+    from .promotion import report as promotion_report
+    pok, pdetail = promotion_report(journal, cfg)
+    ladder = ("<b>ladder readiness (code-enforced)</b>\n"
+              + ("<b style='color:var(--up)'>ALL PASS</b>" if pok
+                 else "<b style='color:var(--warn)'>not yet</b>") + "\n"
+              + pdetail)
+
+    # -- risk & budget gauges ---------------------------------------------
+    limits = cfg["risk"]
+    trades_today = journal.trades_today()
+    t1 = min(trades_today / max(limits["max_trades_per_day"], 1) * 100, 100)
+    a = data["analyst"]
+    c1 = min(a["calls_today"] / max(a["call_cap"] or 1, 1) * 100, 100)
+    c2 = min(a["tokens_today"] / max(a["token_cap"] or 1, 1) * 100, 100)
+    dd_live = 0.0
+    if len(hist) >= 2:
+        peak = hist[0]["total"]
+        for hh in hist:
+            peak = max(peak, hh["total"])
+            if peak > 0:
+                dd_live = max(dd_live, (peak - hh["total"]) / peak * 100)
+    d1 = min(dd_live / 50.0 * 100, 100)
+
+    def gauge(label, pct):
+        hot = " hot" if pct >= 80 else ""
+        return (f"<div class='muted' style='font-size:11px'>{label} "
+                f"({pct:.0f}%)</div>"
+                f"<div class='gauge'><div class='fill{hot}' "
+                f"style='width:{pct:.0f}%'></div></div>")
+
+    gauges = ("<b>guards &amp; budgets (live)</b>\n"
+              + gauge(f"trades today / cap ({trades_today}/"
+                      f"{limits['max_trades_per_day']})", t1)
+              + gauge("drawdown toward 50% gate", d1)
+              + gauge(f"analyst calls ({a['calls_today']}/{a['call_cap']})", c1)
+              + gauge(f"analyst tokens ({a['tokens_today']}/{a['token_cap']})", c2)
+              + "\n halt: "
+              + ("<b class='down'>HALTED</b>" if data["halted"]
+                 else f"armed at ${data['floor']:.2f}"))
+
+    fees_card = ("<b>costs (the silent opponent)</b>\n"
+                 f"fees paid: ${data['fees_paid']:.4f}\n"
+                 f"closed trades: {data['stats']['trades']}\n"
+                 f"fee share: {data['fees_paid'] / data['start_balance'] * 100:.3f}%"
+                 f" of ${data['start_balance']} start\n"
+                 "every fill models 4.5 bps fee + 5 bps slippage")
+
+    panel_row = ("<div class='card' style='flex:1;min-width:240px'>"
+                 f"<div class='panel'>{ladder}</div></div>"
+                 "<div class='card' style='flex:1;min-width:240px'>"
+                 f"<div class='panel'>{gauges}</div></div>"
+                 "<div class='card' style='flex:1;min-width:240px'>"
+                 f"<div class='panel'>{fees_card}</div></div>")
+
+    # -- engine leaderboard from learn_history.jsonl ------------------------
+    lb_rows = []
+    try:
+        if os.path.exists("learn_history.jsonl"):
+            best = {}
+            with open("learn_history.jsonl", encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        r = json.loads(line)
+                    except Exception:
+                        continue
+                    k = (r["engine"], r["coin"])
+                    if k not in best or r["val_expectancy"] > best[k]["val_expectancy"]:
+                        best[k] = r
+            for r in sorted(best.values(),
+                            key=lambda x: x["val_expectancy"], reverse=True)[:12]:
+                cls = "up" if r["val_expectancy"] > 0 else "down"
+                lb_rows.append(
+                    f"<tr><td>{r['date']}</td><td>{r['coin']}</td>"
+                    f"<td>{r['engine']}</td>"
+                    f"<td class='{cls}'>{r['val_expectancy']:+.3f}%/trade</td>"
+                    f"<td>{r['val_trades']}</td></tr>")
+    except Exception:
+        pass
+    if lb_rows:
+        leaderboard_table = ("<div class='scroll'><table><tr><th>date</th>"
+                             "<th>coin</th><th>engine</th>"
+                             "<th>best validation expectancy</th>"
+                             "<th>validate trades</th></tr>"
+                             + "".join(lb_rows) + "</table></div>"
+                             "<div class='muted'>negative = no edge after "
+                             "costs. That is information, not failure.</div>")
+    else:
+        leaderboard_table = ("<p class='muted'>run run_learn.bat to populate "
+                             "the leaderboard</p>")
+    leaderboard = f"<div class='panel'>{leaderboard_table}</div>"
+
     return PAGE.format(
         refresh=cfg.get("dashboard", {}).get("refresh_seconds", 15),
         ts=data["ts"], version=data["version"], halt_banner=halt_banner,
@@ -526,6 +702,8 @@ def render(data, cfg):
         fees=f"${data['fees_paid']:.4f}",
         floor=f"${data['floor']:.2f}", curve=_svg_curve(hist, data["floor"]),
         coin_section=coin_section, trade_map=trade_map,
+        body_class=body_class, controls=controls, staleness=stale,
+        panel_row=panel_row, leaderboard=leaderboard,
         trips_html=trips_html, all_fills_html=all_fills_html,
         n_trips=len(trips), n_fills=len(data["all_fills"]),
         a_provider=a["provider"] or "rules-only", a_key_line=key_line,
@@ -557,8 +735,9 @@ def serve(cfg, open_browser=True):
                     self.end_headers()
                     self.wfile.write(body)
                 elif path == "/":
-                    data = build_data(cfg, journal)
-                    html = render(data, cfg).encode()
+                    view = _view_from(parse_qs(urlparse(self.path).query))
+                    data = build_data(cfg, journal, view)
+                    html = render(data, cfg, view, journal).encode()
                     self.send_response(200)
                     self.send_header("Content-Type", "text/html; charset=utf-8")
                     self.send_header("Content-Length", str(len(html)))
