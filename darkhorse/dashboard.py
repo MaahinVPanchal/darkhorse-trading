@@ -56,41 +56,78 @@ def _coin_pnl_series(journal):
     return dict(series)
 
 
-def _svg_curve(history, floor):
-    """Server-side SVG equity curve: no JS, no CDN, works offline."""
+def _svg_curve(history, floor, exits=None):
+    """Server-side SVG equity curve, zoomed to the DATA range.
+
+    The $5 floor must NOT stretch the scale (that rendered a flat line
+    floating in an empty box when equity barely moves). In-range floor gets a
+    dashed line; a far-away floor gets a bottom badge. Trade exits are dots
+    on the curve, colored by pnl.
+    """
     w, h, pad = 860, 240, 24
     pts = [x["total"] for x in history[-500:]]
     if len(pts) < 2:
         return ("<svg width='100%' height='{h}'><text x='20' y='60' fill='#8b949e'>"
                 "collecting equity marks... run the bot a while longer</text></svg>"
                 ).format(h=h)
-    lo, hi = min(min(pts), floor if floor else min(pts)), max(pts)
-    if hi - lo < 1e-9:
-        lo, hi = lo - 1, hi + 1
+
+    lo, hi = min(pts), max(pts)
+    pad_val = (hi - lo) * 0.15 or max(abs(hi) * 0.002, 0.005)
+    lo, hi = lo - pad_val, hi + pad_val
     span = hi - lo
 
     def xy(i, v):
         x = pad + i / (len(pts) - 1) * (w - 2 * pad)
-        y = h - pad - (v - lo) / span * (h - 2 * pad)
-        return x, y
+        return x, h - pad - (v - lo) / span * (h - 2 * pad)
 
-    path = " ".join(f"{x:.1f},{y:.1f}" for x, y in
-                    (xy(i, v) for i, v in enumerate(pts)))
     parts = [f"<svg viewBox='0 0 {w} {h}' width='100%' height='{h}' "
-             f"preserveAspectRatio='none'>"]
-    if floor and lo <= floor <= hi:
-        fx, fy = 0, xy(0, floor)[1]
-        parts.append(f"<line x1='{pad}' y1='{fy:.1f}' x2='{w - pad}' "
-                     f"y2='{fy:.1f}' stroke='#f85149' stroke-dasharray='6 4' "
-                     f"stroke-width='1.5'/>")
-        parts.append(f"<text x='{pad + 4}' y='{fy - 6:.1f}' fill='#f85149' "
-                     f"font-size='12'>equity floor ${floor:.2f}</text>")
+             f"preserveAspectRatio='none'>",
+             f"<line x1='{pad}' y1='{h - pad:.1f}' x2='{w - pad}' "
+             f"y2='{h - pad:.1f}' stroke='#30363d' stroke-width='1'/>",
+             f"<text x='{pad - 2}' y='14' fill='#8b949e' font-size='11'>"
+             f"${hi:.4f}</text>",
+             f"<text x='{pad - 2}' y='{h - 6:.1f}' fill='#8b949e' "
+             f"font-size='11'>${lo:.4f}</text>"]
+
+    if floor is not None:
+        if lo <= floor <= hi:
+            fy = h - pad - (floor - lo) / span * (h - 2 * pad)
+            parts.append(f"<line x1='{pad}' y1='{fy:.1f}' x2='{w - pad}' "
+                         f"y2='{fy:.1f}' stroke='#f85149' "
+                         f"stroke-dasharray='6 4' stroke-width='1.5'/>")
+            parts.append(f"<text x='{pad + 4}' y='{fy - 6:.1f}' fill='#f85149' "
+                         f"font-size='12'>equity floor ${floor:.2f}</text>")
+        elif floor < lo:
+            pct_below = abs(pts[-1] - floor) / max(abs(pts[-1]), 1e-9) * 100
+            parts.append(f"<text x='{pad + 4}' y='{h - 8:.1f}' "
+                         f"fill='#f85149' font-size='11'>"
+                         f"floor ${floor:.2f} is {pct_below:.0f}% below "
+                         f"equity -- guard armed</text>")
+
     color = "#3fb950" if pts[-1] >= pts[0] else "#f85149"
+    path = " ".join(f"{xy(i, v)[0]:.1f},{xy(i, v)[1]:.1f}"
+                    for i, v in enumerate(pts))
     parts.append(f"<polyline points='{path}' fill='none' stroke='{color}' "
                  f"stroke-width='2'/>")
+
+    if exits:
+        times = [datetime.fromisoformat(x["ts"]).timestamp()
+                 for x in history[-500:]]
+        for e in exits:
+            try:
+                ems = datetime.fromisoformat(e["ts"]).timestamp()
+            except Exception:
+                continue
+            i = bisect.bisect_left(times, ems)
+            i = min(max(i, 0), len(pts) - 1)
+            x, y = xy(i, pts[i])
+            col = "#3fb950" if (e["pnl"] or 0) >= 0 else "#f85149"
+            parts.append(f"<circle cx='{x:.1f}' cy='{y:.1f}' r='4' "
+                         f"fill='{col}' stroke='#0d1117' stroke-width='1'/>")
+
     lx, ly = xy(len(pts) - 1, pts[-1])
     parts.append(f"<circle cx='{lx:.1f}' cy='{ly:.1f}' r='4' fill='{color}'/>")
-    parts.append(f"<text x='{lx - 70:.1f}' y='{ly - 10:.1f}' fill='{color}' "
+    parts.append(f"<text x='{lx - 74:.1f}' y='{ly - 10:.1f}' fill='{color}' "
                  f"font-size='13'>${pts[-1]:.4f}</text>")
     parts.append("</svg>")
     return "".join(parts)
@@ -505,6 +542,8 @@ def render(data, cfg, view=None, journal=None):
         f"{k['name']}={k['status']}" if k["status"]
         else f"<span class='muted'>{k['name']}=not set</span>"
         for k in data["keys"])
+    exits = [{"ts": f["ts"], "pnl": f["pnl"]} for f in data["all_fills"]
+             if f["side"] == "sell" and f["pnl"] is not None]
     coin_curve = _svg_multicurve(data["coin_pnl_series"])
     coin_section = ("<h2>realized pnl by coin (cumulative, per closed trade)</h2>"
                     + coin_curve)
@@ -700,7 +739,8 @@ def render(data, cfg, view=None, journal=None):
         dd=f"{dd:.2f}%", wr=f"{s['win_rate']:.1f}% / {s['trades']}",
         exp_html=_fmt_pnl(s["expectancy"]), pf=pf,
         fees=f"${data['fees_paid']:.4f}",
-        floor=f"${data['floor']:.2f}", curve=_svg_curve(hist, data["floor"]),
+        floor=f"${data['floor']:.2f}",
+        curve=_svg_curve(hist, data["floor"], exits),
         coin_section=coin_section, trade_map=trade_map,
         body_class=body_class, controls=controls, staleness=stale,
         panel_row=panel_row, leaderboard=leaderboard,
