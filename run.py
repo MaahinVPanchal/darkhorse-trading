@@ -17,6 +17,7 @@ import sys
 import requests
 
 from darkhorse import analyst, dashboard, doctor, guards, learn, loop, market, notify
+from darkhorse import __version__ as _dh_version
 from darkhorse.journal import Journal
 from darkhorse.paper import PaperBroker
 
@@ -476,19 +477,78 @@ def cmd_doctor(cfg, args):
     sys.exit(0 if ok else 1)
 
 
+EPILOG = """examples:
+  darkhorse paper --cycles 6              trade a 6-cycle batch (paper, live prices)
+  darkhorse dashboard                     serve the localhost dashboard
+  darkhorse report                        scoreboard: equity, expectancy, drawdown
+  darkhorse digest                        one-paragraph status (also to Telegram)
+  darkhorse learn                         walk-forward parameter search
+  darkhorse reconcile --address 0x...     journal vs venue, read-only
+  darkhorse account --address 0x...       read-only balance lookup
+  darkhorse testnet / binance-testnet     real signed orders, MOCK money
+  darkhorse live                          real money (triple-gated, refuses early)
+  darkhorse doctor / audit / panic        preflight / secrets scan / kill switch
+
+keys live in environment variables only -- never in files, never in chat.
+not financial advice. perps can liquidate your account."""
+
+
 def main():
-    ap = argparse.ArgumentParser(description="Darkhorse paper trading bot")
-    ap.add_argument("command",
-                    choices=["paper", "report", "learn", "live", "resume",
-                             "dashboard", "doctor", "analyst-test", "testnet",
-                             "account", "notify-test", "reconcile",
-                             "digest", "audit", "panic", "binance-testnet"])
-    ap.add_argument("--address", default=None,
-                    help="account: read-only lookup of this 0x address")
-    ap.add_argument("--once", action="store_true", help="run a single cycle")
-    ap.add_argument("--cycles", type=int, default=None, help="run N cycles")
-    ap.add_argument("--no-browser", action="store_true",
-                    help="dashboard: do not open a browser window")
+    ap = argparse.ArgumentParser(
+        prog="darkhorse",
+        description=("Darkhorse -- a $10 AI trading desk that refuses to go "
+                     "below $5. Paper trades live Hyperliquid prices, "
+                     "journals every decision, AI vetoes but never executes."),
+        epilog=EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", action="version",
+                    version=f"Darkhorse v{_dh_version}")
+    sub = ap.add_subparsers(dest="command", required=True, metavar="<command>")
+
+    sp = sub.add_parser("paper", help="paper-trade live prices (simulated money)")
+    sp.add_argument("--once", action="store_true", help="run a single cycle")
+    sp.add_argument("--cycles", type=int, default=None, help="run N cycles")
+
+    sp = sub.add_parser("report", help="scoreboard: equity, expectancy, drawdown, fees")
+
+    sp = sub.add_parser("learn", help="walk-forward parameter search -> proposals")
+
+    sp = sub.add_parser("resume", help="re-enable trading after a floor halt")
+
+    sp = sub.add_parser("live", help="real money -- triple-gated, refuses early")
+    sp.add_argument("--once", action="store_true", help="run a single cycle")
+    sp.add_argument("--cycles", type=int, default=None, help="run N cycles")
+
+    sp = sub.add_parser("testnet", help="Hyperliquid testnet: real orders, mock money")
+    sp.add_argument("--once", action="store_true", help="run a single cycle")
+    sp.add_argument("--cycles", type=int, default=None, help="run N cycles")
+
+    sp = sub.add_parser("binance-testnet",
+                        help="Binance spot testnet: real orders, mock money")
+    sp.add_argument("--once", action="store_true", help="run a single cycle")
+    sp.add_argument("--cycles", type=int, default=None, help="run N cycles")
+
+    sp = sub.add_parser("dashboard", help="serve the localhost dashboard (port 8765)")
+    sp.add_argument("--no-browser", action="store_true",
+                    help="do not open a browser window")
+
+    sp = sub.add_parser("doctor", help="pre-flight checks (11 checks)")
+
+    sp = sub.add_parser("analyst-test",
+                        help="one real call to the configured AI provider")
+
+    sp = sub.add_parser("account", help="read-only balance lookup for an address")
+    sp.add_argument("--address", default=None, help="0x address to look up")
+
+    sp = sub.add_parser("reconcile", help="journal vs venue positions (read-only)")
+    sp.add_argument("--address", default=None, help="0x address to reconcile")
+
+    sp = sub.add_parser("digest", help="one-paragraph status, also to Telegram")
+
+    sp = sub.add_parser("audit", help="scan git history for leaked secrets")
+
+    sp = sub.add_parser("panic", help="kill switch: flatten all + latch halt")
+
     args = ap.parse_args()
     cfg = load_cfg()
     {"paper": lambda: cmd_paper(cfg, args),
