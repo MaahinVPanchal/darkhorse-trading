@@ -5,11 +5,11 @@ the mechanics paper mode can't: signed orders, rate limits, real matching.
 
 Requirements (all enforced at startup):
   1. pip install hyperliquid-python-sdk
-  2. a TESTNET API wallet key in the environment: BLACKHORSE_TESTNET_KEY
+  2. a TESTNET API wallet key in the environment: DARKHORSE_TESTNET_KEY
      (create at app.hyperliquid-testnet.xyz -> API; trade-only, no withdrawals)
   3. config.json testnet.enabled = true
 
-Never put a mainnet key in BLACKHORSE_TESTNET_KEY. If testnet is unreachable
+Never put a mainnet key in DARKHORSE_TESTNET_KEY. If testnet is unreachable
 from your network (doctor will tell you), stay in paper mode -- the strategy
 logic is identical.
 """
@@ -36,12 +36,12 @@ class TestnetBroker:
         if not SDK_AVAILABLE:
             raise RuntimeError("hyperliquid-python-sdk not installed: "
                                "pip install hyperliquid-python-sdk")
-        key = os.environ.get("BLACKHORSE_TESTNET_KEY", "")
+        key = os.environ.get("DARKHORSE_TESTNET_KEY", "")
         if not key:
-            raise RuntimeError("BLACKHORSE_TESTNET_KEY not set. Create a "
+            raise RuntimeError("DARKHORSE_TESTNET_KEY not set. Create a "
                                "TESTNET API wallet at app.hyperliquid-testnet.xyz "
                                "(API page), copy its key, then: "
-                               "setx BLACKHORSE_TESTNET_KEY \"...\"")
+                               "setx DARKHORSE_TESTNET_KEY \"...\"")
         self.j = journal
         self.cfg = cfg
         self.wallet = Account.from_key(key)

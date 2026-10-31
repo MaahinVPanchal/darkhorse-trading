@@ -22,7 +22,7 @@ def check(name, ok, detail=""):
 
 
 def run(cfg):
-    print("Blackhorse doctor -- pre-flight checks\n")
+    print("Darkhorse doctor -- pre-flight checks\n")
 
     v = sys.version_info
     check("python >= 3.10", v >= (3, 10), f"{v.major}.{v.minor}.{v.micro}")
@@ -99,7 +99,7 @@ def run(cfg):
             sdk = "sdk installed"
         except ImportError:
             sdk = "SDK MISSING: pip install hyperliquid-python-sdk"
-        key = os.environ.get("BLACKHORSE_TESTNET_KEY")
+        key = os.environ.get("DARKHORSE_TESTNET_KEY")
         t0 = time.time()
         try:
             r = _rq.post("https://api.hyperliquid-testnet.xyz/info",
@@ -110,7 +110,7 @@ def run(cfg):
             net, ok_net = f"UNREACHABLE from this network ({e.__class__.__name__})", False
         check("testnet network", ok_net, net)
         check("testnet sdk + key", bool(sdk.startswith("sdk") and key),
-              f"{sdk}; key={'set' if key else 'MISSING (setx BLACKHORSE_TESTNET_KEY)'}")
+              f"{sdk}; key={'set' if key else 'MISSING (setx DARKHORSE_TESTNET_KEY)'}")
 
     fails = sum(1 for _, ok, _ in RESULTS if not ok)
     print(f"\n{len(RESULTS) - fails}/{len(RESULTS)} checks passed."

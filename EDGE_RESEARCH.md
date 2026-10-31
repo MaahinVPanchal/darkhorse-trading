@@ -29,7 +29,7 @@ strength — where does edge actually come from, and what is reachable here?
 5. **LLM sentiment/event overlay** — unproven (fleet studies show no edge);
    our analyst keeps its veto-only role.
 
-## The honest Jane Street takeaway for Blackhorse
+## The honest Jane Street takeaway for Darkhorse
 
 Jane Street's moat is not a secret algorithm — it's (a) flow information,
 (b) execution cost control, (c) risk discipline across MANY small edges,

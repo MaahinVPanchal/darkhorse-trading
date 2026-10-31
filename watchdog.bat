@@ -1,5 +1,5 @@
 @echo off
-title Blackhorse WATCHDOG - paper mode auto-restart
+title Darkhorse WATCHDOG - paper mode auto-restart
 cd /d "%~dp0"
 echo Watchdog started: paper mode will auto-restart if it crashes or halts-exit.
 echo Logs append to watchdog.log and paper.log. Close this window to stop.

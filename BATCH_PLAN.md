@@ -43,7 +43,7 @@ SSL root-cause · `reconcile` · learn embargo · live tests · commit/push · r
 
 | # | Task | Status |
 |---|---|---|
-| 1 | Mainnet adapter (`blackhorse/mainnet_broker.py`) | ✅ TRIPLE-GATED: live.enabled + exact ACK + promotion criteria computed from journal |
+| 1 | Mainnet adapter (`darkhorse/mainnet_broker.py`) | ✅ TRIPLE-GATED: live.enabled + exact ACK + promotion criteria computed from journal |
 | 2 | Exchange-side stop orders + dead-man's switch | ⏸ deferred — needs a live testnet session to verify trigger orders (code slot ready) |
 | 3 | OpenAlgo bridge evaluation | ✅ research note (AGPL caveat) |
 | 4 | Latency + partial-fill modeling upgrade | ⏸ reserved — paper modeling already covers fee+slip; upgrade when testnet data exists |

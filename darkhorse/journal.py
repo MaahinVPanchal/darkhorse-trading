@@ -68,7 +68,7 @@ def today_utc():
 
 
 class Journal:
-    def __init__(self, path="blackhorse.db"):
+    def __init__(self, path="darkhorse.db"):
         self.conn = sqlite3.connect(path)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)

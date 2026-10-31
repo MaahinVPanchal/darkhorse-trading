@@ -13,7 +13,7 @@ It needs nothing from you except this folder.
   `learned_proposals.json` with better parameter suggestions (you apply them by
   editing `config.json` — it never edits itself).
 
-Let it run for hours/days. The journal (`blackhorse.db`) keeps everything.
+Let it run for hours/days. The journal (`darkhorse.db`) keeps everything.
 
 ## 2. Optional: turn on the AI decision layer (your $5 Jev credit)
 

@@ -1,11 +1,11 @@
-# 📋 Experiment Log — Blackhorse Trading
+# 📋 Experiment Log — Darkhorse Trading
 
 Public, dated, honest. This file is the receipt trail: what we tested, what it
 showed, and what we did next. Nothing here is a performance promise.
 
 **The commitment:** paper first for weeks → testnet with mock money → mainnet
 only if the pre-registered criteria below are met. Every claim in this file
-links to the SQLite journal it came from (`blackhorse.db`).
+links to the SQLite journal it came from (`darkhorse.db`).
 
 ---
 

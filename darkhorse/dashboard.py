@@ -293,7 +293,7 @@ def build_data(cfg, journal):
 
 PAGE = """<!doctype html>
 <html><head><meta charset="utf-8">
-<title>Blackhorse - live paper desk</title>
+<title>Darkhorse - live paper desk</title>
 <meta http-equiv="refresh" content="{refresh}">
 <style>
   body{{background:#0d1117;color:#c9d1d9;font-family:Consolas,'Courier New',monospace;
@@ -315,7 +315,7 @@ PAGE = """<!doctype html>
           border-radius:6px}}
   .halt{{background:#f8514922;border:1px solid #f85149;color:#f85149}}
 </style></head><body>
-<h1>BLACKHORSE <span class="muted">live paper desk</span></h1>
+<h1>DARKHORSE <span class="muted">live paper desk</span></h1>
 <div class="muted">updated {ts} &middot; refreshes every {refresh}s &middot; v{version}</div>
 {halt_banner}
 <div class="row">

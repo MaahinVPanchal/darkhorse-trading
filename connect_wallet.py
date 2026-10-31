@@ -3,7 +3,7 @@
 You paste the testnet API-wallet key into a HIDDEN prompt on your own machine.
 This script then, automatically:
   1. validates the key and derives its address
-  2. saves it permanently as the BLACKHORSE_TESTNET_KEY env var (setx)
+  2. saves it permanently as the DARKHORSE_TESTNET_KEY env var (setx)
   3. shows your testnet/mainnet account balances (read-only check)
   4. runs the full doctor pre-flight
 
@@ -52,7 +52,7 @@ def show_account(address):
 
 def main():
     print("=" * 62)
-    print("BLACKHORSE wallet connect (one-time, 30 seconds)")
+    print("DARKHORSE wallet connect (one-time, 30 seconds)")
     print("=" * 62)
     print("This expects the TESTNET API-wallet PRIVATE KEY from")
     print("app.hyperliquid-testnet.xyz -> API page (trade-only key).\n")
@@ -77,10 +77,10 @@ def main():
     print("(API wallets have their own address -- that's normal. What matters")
     print(" is that YOU generated it from your account on the testnet site.)")
 
-    subprocess.run(["setx", "BLACKHORSE_TESTNET_KEY", key],
+    subprocess.run(["setx", "DARKHORSE_TESTNET_KEY", key],
                    capture_output=True, check=True)
-    os.environ["BLACKHORSE_TESTNET_KEY"] = key
-    print("saved permanently as BLACKHORSE_TESTNET_KEY (user env var).\n")
+    os.environ["DARKHORSE_TESTNET_KEY"] = key
+    print("saved permanently as DARKHORSE_TESTNET_KEY (user env var).\n")
 
     reach = show_account(address)
     print()

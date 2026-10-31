@@ -1,4 +1,4 @@
-# Contributing to Blackhorse Trading
+# Contributing to Darkhorse Trading
 
 First: **thank you**. This project exists to be built in public — the honest
 counter-example to "$14 → $7,643" screenshots. Every contribution, from a

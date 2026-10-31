@@ -1,8 +1,12 @@
 <div align="center">
 
-# 🐎 Blackhorse Trading
+# 🐎 Darkhorse Trading
 
 ### A $10 AI trading desk that refuses to go below $5 — with receipts, not screenshots.
+
+**Darkhorse** (n.): the little-known competitor that wins against all
+expectations. That's the thesis — not a lambo promise, but the disciplined
+underdog that publishes every loss.
 
 [![Python](https://img.shields.io/badge/python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org)
 [![Status](https://img.shields.io/badge/stage-paper--trading-yellow?style=flat-square)](#-the-ladder-paper--testnet--mainnet)
@@ -14,7 +18,7 @@
 
 *Educational software — not financial advice. Perps can liquidate 100% of an account.*
 
-<img src="docs/dashboard.png" alt="Blackhorse live dashboard: stat cards, equity curve with the $5 floor as a red line, agent hive, decision feed with CODE vs CODE+LLM tags" width="100%">
+<img src="docs/dashboard.png" alt="Darkhorse live dashboard: stat cards, equity curve with the $5 floor as a red line, agent hive, decision feed with CODE vs CODE+LLM tags" width="100%">
 
 </div>
 
@@ -40,6 +44,7 @@
 - [How it learns](#-how-it-learns-honestly)
 - [Repo comparison](#-how-it-compares-to-the-public-repos)
 - [Contributing](#-contributing-build-this-with-us)
+- [Naming & rights](#-naming--rights)
 - [Honest numbers](#-honest-numbers)
 - [India note](#-india-note)
 
@@ -66,7 +71,7 @@ pip install -r requirements.txt   # requests + hyperliquid sdk — that's all
 
 | Double-click | What happens |
 |---|---|
-| 🚀 `start_blackhorse.bat` | **one click = everything**: paper bot (auto-restart) + dashboard, browser opens |
+| 🚀 `start_darkhorse.bat` | **one click = everything**: paper bot (auto-restart) + dashboard, browser opens |
 | 🟢 `run_paper.bat` | **paper-trades live crypto prices** with simulated money. Leave the window open. |
 | 📊 `run_dashboard.bat` | opens **http://127.0.0.1:8765** — watch the agents work |
 | 🧾 `run_report.bat` | scoreboard: equity, win rate, profit factor, drawdown, fees |
@@ -120,7 +125,7 @@ setx ANTHROPIC_API_KEY "claude-key"    :: chat (native /v1/messages)
 setx GEMINI_API_KEY / DEEPSEEK_API_KEY / GROQ_API_KEY / MISTRAL_API_KEY / TOGETHER_API_KEY / XAI_API_KEY / OPENROUTER_API_KEY / ZAI_API_KEY
 setx OLLAMA_ENABLED 1                  :: local models, no key, no cost
 setx ANALYST_BASE_URL "..."  + ANALYST_API_KEY + ANALYST_MODEL   :: ANY other OpenAI-compatible endpoint
-setx BLACKHORSE_TESTNET_KEY "0x..."    :: testnet API-wallet key (trade-only, CANNOT withdraw)
+setx DARKHORSE_TESTNET_KEY "0x..."    :: testnet API-wallet key (trade-only, CANNOT withdraw)
 setx TELEGRAM_BOT_TOKEN "..."          :: optional: phone alerts on every fill + halt
 setx TELEGRAM_CHAT_ID "..."            :: optional: your chat id (see below)
 ```
@@ -192,7 +197,7 @@ posts hide.
 | [Jesse](https://jesse.trade) (~5k★) | Strategy research & backtesting framework, clean Python API | No LLM | Backtest/paper focus |
 | [OctoBot](https://github.com/Drakkar-Software/OctoBot) | User-friendly bot with AI/ML integrations | Pluggable AI/ML evaluators | Paper/trading modes |
 
-**What Blackhorse took from each** (and where it lives):
+**What Darkhorse took from each** (and where it lives):
 
 - beebots → model never sees the order endpoint · live ACK string · `CODE`/`CODE+LLM` tags · code fallback on budget/latency *(analyst.py, run.py, dashboard.py)*
 - hypergrok → pre-flight `doctor` · one-writer execution · keyless reads *(doctor.py, market.py)*
@@ -249,7 +254,7 @@ or tax advice.
 run.py                  CLI: paper|report|learn|resume|dashboard|doctor|analyst-test|testnet|account|live
 config.json             every knob: symbols, risk caps, floor, fees, analyst providers + budget
 connect_wallet.py/.bat  one-time: hidden key prompt -> setx -> verify -> balances
-grokbot→blackhorse/
+grokbot→darkhorse/
   market.py             Hyperliquid public data (no keys to read)
   strategy.py           TWO engines: EMA trend cross + RSI mean-reversion (config picks)
   risk.py               veto layer: caps, loss limit, cooldown
@@ -264,6 +269,21 @@ grokbot→blackhorse/
   dashboard.py          localhost UI (stdlib, SVG curve)
   doctor.py             pre-flight checks
 ```
+
+## 🛡️ Naming & rights
+
+- **The name**: "Darkhorse" = the unexpected winner. It was chosen over
+  "Blackhorse" specifically to stay clear of the Lloyds Bank black-horse mark
+  and existing Blackhorse-branded financial firms. If you fork: rename your
+  fork and don't present it as the original.
+- **No financial services**: this is open-source *software* under MIT. It is
+  not a broker, adviser, or fund; nothing here solicits deposits. Names,
+  logos, and the "publish our failures" format refer to this repository only.
+- **Impersonation warning**: we will never DM you, never run a "support"
+  Telegram that asks for keys, and never take deposits. Report fakes via the
+  repo's Issues tab. See [SECURITY.md](SECURITY.md).
+- **Code of conduct**: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — promoting
+  deposit links or "guaranteed profit" schemes is an instant ban.
 
 ## 📜 License
 

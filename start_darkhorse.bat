@@ -1,11 +1,11 @@
 @echo off
-title Blackhorse - ONE-CLICK START (paper + dashboard)
+title Darkhorse - ONE-CLICK START (paper + dashboard)
 cd /d "%~dp0"
 echo Starting the full desk: paper trading (watchdog) + dashboard...
 echo.
-start "Blackhorse DASHBOARD - keep open" cmd /k ""C:\Users\HP\AppData\Local\Programs\Python\Python312\python.exe" run.py dashboard"
+start "Darkhorse DASHBOARD - keep open" cmd /k ""C:\Users\HP\AppData\Local\Programs\Python\Python312\python.exe" run.py dashboard"
 timeout /t 2 /nobreak >nul
-start "Blackhorse PAPER WATCHDOG - keep open" cmd /k watchdog.bat
+start "Darkhorse PAPER WATCHDOG - keep open" cmd /k watchdog.bat
 timeout /t 3 /nobreak >nul
 echo.
 echo   Both windows are running:

@@ -18,7 +18,7 @@ def run_cycle(journal, broker, cfg, use_analyst=True, verbose=True):
         equity = broker.equity(prices)
         journal.record_equity(broker.cash(), broker.unrealized(prices), equity)
         if not was_halted:
-            notify.send(f"BLACKHORSE HALTED (equity ${equity:.4f} <= floor "
+            notify.send(f"DARKHORSE HALTED (equity ${equity:.4f} <= floor "
                         f"${floor:.2f}):\n{note}\n\n"
                         f"Run resume.bat to re-enable (your call).")
         if verbose:

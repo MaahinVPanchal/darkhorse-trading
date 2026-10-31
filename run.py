@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Blackhorse CLI.
+"""Darkhorse CLI.
 
   python run.py paper            run paper trading continuously (Ctrl-C to stop)
   python run.py paper --once     one single cycle
@@ -16,9 +16,9 @@ import sys
 
 import requests
 
-from blackhorse import analyst, dashboard, doctor, guards, learn, loop, market, notify
-from blackhorse.journal import Journal
-from blackhorse.paper import PaperBroker
+from darkhorse import analyst, dashboard, doctor, guards, learn, loop, market, notify
+from darkhorse.journal import Journal
+from darkhorse.paper import PaperBroker
 
 TESTNET_URL = "https://api.hyperliquid-testnet.xyz"
 MAINNET_URL = "https://api.hyperliquid.xyz"
@@ -40,7 +40,7 @@ def cmd_paper(cfg, args):
                  cycles=(1 if args.once else args.cycles),
                  use_analyst=True)
     except KeyboardInterrupt:
-        print("\nStopped. Journal saved in blackhorse.db -- run `python run.py report`.")
+        print("\nStopped. Journal saved in darkhorse.db -- run `python run.py report`.")
 
 
 def cmd_report(cfg, args):
@@ -50,7 +50,7 @@ def cmd_report(cfg, args):
     start = cfg["paper"]["start_balance_usd"]
     floor, floor_desc = guards.effective_floor(cfg)
     print("=" * 60)
-    print("BLACKHORSE PAPER REPORT")
+    print("DARKHORSE PAPER REPORT")
     print("=" * 60)
     if guards.is_halted(journal):
         print(f"*** HALTED: {journal.get_state('halt_reason')} ***")
@@ -123,7 +123,7 @@ def cmd_learn(cfg, args):
 
 def cmd_live(cfg, args):
     """Rung 3: REAL money. Triple gate: config + ACK + promotion criteria."""
-    from blackhorse import promotion
+    from darkhorse import promotion
     journal = Journal()
     ok, detail = promotion.report(journal, cfg)
     ack_set = cfg["live"].get("acknowledgement") == "I-ACCEPT-REAL-MONEY-RISK"
@@ -139,7 +139,7 @@ def cmd_live(cfg, args):
     print("\nAll gates passed. Starting MAINNET trading with REAL money.")
     print("Perps can liquidate the entire account.\n")
     try:
-        from blackhorse.mainnet_broker import MainnetBroker
+        from darkhorse.mainnet_broker import MainnetBroker
         broker = MainnetBroker(journal, cfg)
     except ImportError:
         print("hyperliquid-python-sdk missing: pip install hyperliquid-python-sdk")
@@ -163,7 +163,7 @@ def cmd_live(cfg, args):
 
 def cmd_digest(cfg, args):
     """One Telegram/console summary: equity, trades, criteria verdict."""
-    from blackhorse import notify, promotion
+    from darkhorse import notify, promotion
     journal = Journal()
     stats = journal.trade_stats()
     eq = journal.latest_equity()
@@ -212,9 +212,9 @@ def cmd_panic(cfg, args):
     journal = Journal()
     prices = market.all_mids()
     broker = None
-    if cfg.get("testnet", {}).get("enabled") and os.environ.get("BLACKHORSE_TESTNET_KEY"):
+    if cfg.get("testnet", {}).get("enabled") and os.environ.get("DARKHORSE_TESTNET_KEY"):
         try:
-            from blackhorse.testnet_broker import TestnetBroker
+            from darkhorse.testnet_broker import TestnetBroker
             broker = TestnetBroker(journal, cfg)
         except Exception as e:
             print(f"testnet broker unavailable ({e.__class__.__name__}) -- "
@@ -262,10 +262,10 @@ def cmd_testnet(cfg, args):
         print("Testnet trading is disabled (config testnet.enabled=false).")
         print("Setup: 1) pip install hyperliquid-python-sdk")
         print("       2) create a TESTNET API wallet at app.hyperliquid-testnet.xyz")
-        print('       3) setx BLACKHORSE_TESTNET_KEY "..."   (trade-only key)')
+        print('       3) setx DARKHORSE_TESTNET_KEY "..."   (trade-only key)')
         print("       4) set testnet.enabled=true in config.json")
         sys.exit(1)
-    from blackhorse.testnet_broker import TestnetBroker, TESTNET_URL, SDK_AVAILABLE
+    from darkhorse.testnet_broker import TestnetBroker, TESTNET_URL, SDK_AVAILABLE
     if not SDK_AVAILABLE:
         print("hyperliquid-python-sdk is not installed: pip install hyperliquid-python-sdk")
         sys.exit(1)
@@ -293,24 +293,24 @@ def cmd_testnet(cfg, args):
         loop.run(journal, broker, cfg, cycles=(1 if args.once else args.cycles),
                  use_analyst=True)
     except KeyboardInterrupt:
-        print("\nStopped. Journal updated in blackhorse.db -- `python run.py report`.")
+        print("\nStopped. Journal updated in darkhorse.db -- `python run.py report`.")
 
 
 def cmd_account(cfg, args):
     """READ-ONLY account lookup. Proves connectivity and shows balances.
     An address can VIEW an account; only its key can TRADE from it."""
     address = args.address
-    key = os.environ.get("BLACKHORSE_TESTNET_KEY")
+    key = os.environ.get("DARKHORSE_TESTNET_KEY")
     if not address and key:
         try:
             from eth_account import Account
             address = Account.from_key(key).address
-            print(f"address resolved from BLACKHORSE_TESTNET_KEY: {address}")
+            print(f"address resolved from DARKHORSE_TESTNET_KEY: {address}")
         except Exception:
             pass
     if not address:
         print("No address. Usage: python run.py account --address 0x...")
-        print("(or set BLACKHORSE_TESTNET_KEY and it derives the address)")
+        print("(or set DARKHORSE_TESTNET_KEY and it derives the address)")
         sys.exit(1)
 
     for label, base in (("TESTNET", TESTNET_URL), ("MAINNET", MAINNET_URL)):
@@ -363,7 +363,7 @@ def cmd_account(cfg, args):
 def cmd_reconcile(cfg, args):
     """NautilusTrader-style reconciliation: journal vs venue, READ-ONLY."""
     address = args.address
-    key = os.environ.get("BLACKHORSE_TESTNET_KEY")
+    key = os.environ.get("DARKHORSE_TESTNET_KEY")
     if not address and key:
         try:
             from eth_account import Account
@@ -426,7 +426,7 @@ def cmd_reconcile(cfg, args):
 
 
 def cmd_notify_test(cfg, args):
-    from blackhorse import notify
+    from darkhorse import notify
     ok, msg = notify.test()
     print(("OK: " if ok else "FAILED: ") + msg)
     sys.exit(0 if ok else 1)
@@ -442,7 +442,7 @@ def cmd_doctor(cfg, args):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Blackhorse paper trading bot")
+    ap = argparse.ArgumentParser(description="Darkhorse paper trading bot")
     ap.add_argument("command",
                     choices=["paper", "report", "learn", "live", "resume",
                              "dashboard", "doctor", "analyst-test", "testnet",

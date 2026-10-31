@@ -49,7 +49,7 @@ def fills_message(actions, equity):
         if a.get("reason"):
             line += f"\n{i_reason(a['reason'])}"
         lines.append(line)
-    return ("Blackhorse paper desk\n" + "\n".join(lines)
+    return ("Darkhorse paper desk\n" + "\n".join(lines)
             + f"\nequity ${equity:.4f}")
 
 
@@ -58,7 +58,7 @@ def i_reason(reason):
 
 
 def digest_message(cfg, stats, total, halted):
-    return ("Blackhorse daily digest\n"
+    return ("Darkhorse daily digest\n"
             f"equity ${total:.4f} | trades {stats['trades']} | "
             f"win {stats['win_rate']:.0f}%\n"
             f"expectancy ${stats['expectancy']:+.4f}/trade | "
@@ -71,7 +71,7 @@ def test():
         return False, ("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set. "
                        "Create a bot with @BotFather, then setx both vars "
                        "and open a NEW terminal.")
-    ok = send("Blackhorse notify test -- connection OK.")
+    ok = send("Darkhorse notify test -- connection OK.")
     if ok:
         return True, "message delivered to your chat"
     return False, "send failed -- check the token and that you messaged the bot once"
