@@ -182,10 +182,12 @@ to rules-only.
 ```
 
 - **①** runs today: `run_paper.bat`.
-- **②** needs the API key: testnet site → **API page** → *Approve API Wallet* →
-  sign in MetaMask (free) → copy the private key → `connect_wallet.bat` →
-  `testnet.enabled: true` → `testnet.bat`. Same guards: $5 floor, daily loss
-  cap, cooldowns, halt latch.
+- **②** needs one MetaMask signature: `darkhorse connect` → the bot generates
+  a trade-only agent key locally → your browser opens → click **Connect
+  MetaMask** → **Approve agent** (one free signature) → done: key saved,
+  venue enabled. `testnet.bat` then trades with your test ETH/USDC. Same
+  guards: $5 floor, daily loss cap, cooldowns, halt latch. (Fallback if
+  MetaMask is unavailable: the old copy-paste flow via `connect_wallet.bat`.)
 - **③** unlocks only when `live.enabled = true` **and**
   `live.acknowledgement = "I-ACCEPT-REAL-MONEY-RISK"` — the engine refuses
   otherwise. Weeks of positive paper expectancy and India tax/legal clearance

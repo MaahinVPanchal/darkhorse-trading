@@ -468,6 +468,12 @@ def cmd_binance_testnet(cfg, args):
         print("Stopped. Journal updated -- `python run.py report`.")
 
 
+def cmd_connect(cfg, args):
+    """Seamless MetaMask: local page -> one signature -> agent registered."""
+    from darkhorse.webauth import run_connect
+    run_connect(cfg, args)
+
+
 def cmd_dashboard(cfg, args):
     dashboard.serve(cfg, open_browser=not args.no_browser)
 
@@ -528,6 +534,11 @@ def main():
     sp.add_argument("--once", action="store_true", help="run a single cycle")
     sp.add_argument("--cycles", type=int, default=None, help="run N cycles")
 
+    sp = sub.add_parser("connect",
+                        help="connect MetaMask: one signature -> trade-only agent")
+    sp.add_argument("--no-browser", action="store_true",
+                    help="do not open the connect page automatically")
+
     sp = sub.add_parser("dashboard", help="serve the localhost dashboard (port 8765)")
     sp.add_argument("--no-browser", action="store_true",
                     help="do not open a browser window")
@@ -566,7 +577,8 @@ def main():
      "digest": lambda: cmd_digest(cfg, args),
      "audit": lambda: cmd_audit(cfg, args),
      "panic": lambda: cmd_panic(cfg, args),
-     "binance-testnet": lambda: cmd_binance_testnet(cfg, args)}[args.command]()
+     "binance-testnet": lambda: cmd_binance_testnet(cfg, args),
+     "connect": lambda: cmd_connect(cfg, args)}[args.command]()
 
 
 if __name__ == "__main__":
