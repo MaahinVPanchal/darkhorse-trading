@@ -89,7 +89,24 @@ adapters: [VENUES.md](VENUES.md)
 | 🧪 `testnet.bat` | **real signed orders, mock money** on Hyperliquid testnet |
 | 🔓 `resume.bat` | re-enable trading after the equity-floor halt |
 
-CLI: `python run.py paper|report|learn|dashboard|doctor|resume|testnet|account|analyst-test|live`
+CLI: `python run.py paper|report|learn|dashboard|doctor|resume|testnet|account|analyst-test|reconcile|digest|audit|panic|live`
+
+### ⌨️ Terminal & shortcuts (the fast way)
+
+A global `darkhorse` command is installed during setup -- it works from
+**any** terminal, in any directory:
+
+```
+darkhorse paper --cycles 6     # trade a batch
+darkhorse report               # scoreboard
+darkhorse digest               # one-paragraph status (also -> Telegram)
+darkhorse reconcile --address 0x...
+darkhorse doctor / audit / panic / learn / testnet / live
+```
+
+Desktop shortcuts (created with the repo): **Ctrl+Alt+D** = dashboard,
+**Ctrl+Alt+B** = start everything. Speed: CLI starts in 0.26s; the dashboard
+caches candles for 60s so refreshes are ~1.1s instead of 4.4s.
 
 ## 🖥️ The Dashboard (what is happening right now)
 

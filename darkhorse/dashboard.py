@@ -33,14 +33,23 @@ def _mask(value):
     return value[:4] + "..." + value[-4:] if len(value) > 12 else "set"
 
 
+_CANDLE_CACHE = {"ts": 0.0, "tf": None, "data": {}}
+_CANDLE_TTL = 60.0  # seconds -- 15s refreshes reuse the cache, 4x fewer calls
+
+
 def _candles_map(cfg, view=None):
+    import time as _time
     tf = (view or {}).get("tf") or cfg["timeframe"]
+    now = _time.time()
+    if _CANDLE_CACHE["tf"] == tf and now - _CANDLE_CACHE["ts"] < _CANDLE_TTL:
+        return _CANDLE_CACHE["data"]
     out = {}
     for coin in cfg["symbols"]:
         try:
             out[coin] = market.candles(coin, tf, 150)
         except Exception:
             pass
+    _CANDLE_CACHE.update({"ts": now, "tf": tf, "data": out})
     return out
 
 
