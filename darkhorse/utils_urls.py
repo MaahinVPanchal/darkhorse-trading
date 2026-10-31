@@ -2,3 +2,4 @@
 
 TESTNET_URL = "https://api.hyperliquid-testnet.xyz"
 MAINNET_URL = "https://api.hyperliquid.xyz"
+BINANCE_TESTNET_URL = "https://testnet.binance.vision"

@@ -123,5 +123,31 @@
     "ema_fast": 10,
     "ema_slow": 30,
     "note": "Multi-timeframe gate: block entries when the higher timeframe EMA trend is against the trade"
+  },
+  "venues": {
+    "hyperliquid_testnet": {
+      "enabled": false,
+      "env": [
+        "BLACKHORSE_TESTNET_KEY"
+      ],
+      "command": "run.py testnet"
+    },
+    "binance_testnet": {
+      "enabled": false,
+      "env": [
+        "BINANCE_API_KEY",
+        "BINANCE_API_SECRET"
+      ],
+      "command": "run.py binance-testnet"
+    },
+    "mainnet": {
+      "enabled": false,
+      "env": [
+        "HYPERLIQUID_MAINNET_KEY"
+      ],
+      "command": "run.py live",
+      "gate": "promotion criteria + ACK (code-enforced)"
+    },
+    "note": "Pluggable venue adapters. All share the same loop, guards, analyst veto and journal. See VENUES.md for the full platform map (Schwab/public.com/Groww/Robinhood research)."
   }
 }

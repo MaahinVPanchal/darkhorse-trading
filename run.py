@@ -432,6 +432,41 @@ def cmd_notify_test(cfg, args):
     sys.exit(0 if ok else 1)
 
 
+def cmd_binance_testnet(cfg, args):
+    """Venue adapter 2: Binance SPOT TESTNET -- real signed orders, mock money."""
+    v = cfg.get("venues", {}).get("binance_testnet", {})
+    if not v.get("enabled"):
+        print("Binance spot-testnet trading is disabled "
+              "(config venues.binance_testnet.enabled=false).")
+        print("Setup: 1) log in at https://testnet.binance.vision with GitHub")
+        print("       2) Generate HMAC keys")
+        print('       3) setx BINANCE_API_KEY "..."  setx BINANCE_API_SECRET "..."')
+        print("       4) set venues.binance_testnet.enabled=true, then rerun")
+        sys.exit(1)
+    from darkhorse.binance_broker import BinanceSpotBroker
+    journal = Journal()
+    try:
+        broker = BinanceSpotBroker(journal, cfg)
+    except RuntimeError as e:
+        print(f"Setup problem: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Could not reach Binance testnet: {e.__class__.__name__}: {e}")
+        sys.exit(1)
+    account = broker.equity()
+    cfg["paper"]["start_balance_usd"] = max(
+        2 * cfg["halt"]["equity_floor_usd"], account)
+    print("BINANCE SPOT TESTNET (real signed orders, MOCK money)")
+    print(f"account value: ${account:.2f} | Ctrl-C to stop.")
+    print()
+    try:
+        loop.run(journal, broker, cfg,
+                 cycles=(1 if args.once else args.cycles), use_analyst=True)
+    except KeyboardInterrupt:
+        print()
+        print("Stopped. Journal updated -- `python run.py report`.")
+
+
 def cmd_dashboard(cfg, args):
     dashboard.serve(cfg, open_browser=not args.no_browser)
 
@@ -447,7 +482,7 @@ def main():
                     choices=["paper", "report", "learn", "live", "resume",
                              "dashboard", "doctor", "analyst-test", "testnet",
                              "account", "notify-test", "reconcile",
-                             "digest", "audit", "panic"])
+                             "digest", "audit", "panic", "binance-testnet"])
     ap.add_argument("--address", default=None,
                     help="account: read-only lookup of this 0x address")
     ap.add_argument("--once", action="store_true", help="run a single cycle")
@@ -470,7 +505,8 @@ def main():
      "reconcile": lambda: cmd_reconcile(cfg, args),
      "digest": lambda: cmd_digest(cfg, args),
      "audit": lambda: cmd_audit(cfg, args),
-     "panic": lambda: cmd_panic(cfg, args)}[args.command]()
+     "panic": lambda: cmd_panic(cfg, args),
+     "binance-testnet": lambda: cmd_binance_testnet(cfg, args)}[args.command]()
 
 
 if __name__ == "__main__":

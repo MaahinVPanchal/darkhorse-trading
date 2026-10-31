@@ -63,11 +63,17 @@ So this project is built the boring, honest way:
 - **AI = referee, not gambler** — Jev/Nebius may only say "skip"; they never size or execute
 - **A floor that halts the bot**: `$10 in → equity touches $5 → everything flattens`
 
-## ⚡ Quick Start (no account, no keys, no money)
+## ⚡ Quick Start — 3 steps, anyone can run it
 
 ```bash
-pip install -r requirements.txt   # requests + hyperliquid sdk — that's all
+1. pip install -r requirements.txt      # 30 seconds
+2. setup.bat                            # pick a venue, paste its key (hidden input) -- or skip for paper-only
+3. start_darkhorse.bat                  # paper bot + dashboard, browser opens
 ```
+
+Venues: paper (no keys) · Hyperliquid testnet (MetaMask) · Binance spot
+testnet (GitHub login). Full platform map incl. Schwab/public.com/Groww
+adapters: [VENUES.md](VENUES.md)
 
 | Double-click | What happens |
 |---|---|
