@@ -102,12 +102,23 @@ Keys live **only in Windows environment variables** — never in chat, never in
 this repo, never in a file:
 
 ```bat
-setx TYPESAFE_API_KEY "jev-key"        :: your $5 Jev credit (~119B input tokens — effectively unlimited)
-setx NEBIUS_API_KEY "nebius-key"       :: fallback, OpenAI-compatible
+setx TYPESAFE_API_KEY "jev-key"        :: decision API: Jev ($0.042/M input, output free — $5 credit ≈ unlimited)
+setx OPENAI_API_KEY "openai-key"       :: decision API: gpt-6-luna Decisions API ($0.10/M) OR chat, auto-prefers Decisions
+setx NEBIUS_API_KEY "nebius-key"       :: chat fallback, OpenAI-compatible
+setx ANTHROPIC_API_KEY "claude-key"    :: chat (native /v1/messages)
+setx GEMINI_API_KEY / DEEPSEEK_API_KEY / GROQ_API_KEY / MISTRAL_API_KEY / TOGETHER_API_KEY / XAI_API_KEY / OPENROUTER_API_KEY / ZAI_API_KEY
+setx OLLAMA_ENABLED 1                  :: local models, no key, no cost
+setx ANALYST_BASE_URL "..."  + ANALYST_API_KEY + ANALYST_MODEL   :: ANY other OpenAI-compatible endpoint
 setx BLACKHORSE_TESTNET_KEY "0x..."    :: testnet API-wallet key (trade-only, CANNOT withdraw)
 setx TELEGRAM_BOT_TOKEN "..."          :: optional: phone alerts on every fill + halt
 setx TELEGRAM_CHAT_ID "..."            :: optional: your chat id (see below)
 ```
+
+**15 providers, one interface.** Two decision APIs (Jev, OpenAI gpt-6-luna)
+answer typed *proceed/skip + trend-probability* questions; 12 chat providers
+answer strict JSON; one `custom` slot accepts any OpenAI-compatible endpoint.
+Whichever key exists first (in that order) is used; the others are fallbacks.
+Every provider obeys the same budget cap and the same veto-only rules.
 
 **Telegram alerts (5 min, optional):** talk to **@BotFather** → `/newbot` → copy
 the token → send any message to your new bot → open

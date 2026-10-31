@@ -69,10 +69,8 @@ def run(cfg):
 
     provider = analyst.available(cfg)
     if cfg["analyst"].get("enabled"):
-        keys_found = [k for k in ("TYPESAFE_API_KEY", "TYPESAFE_AI_API_KEY",
-                                  "NEBIUS_API_KEY", "XAI_API_KEY",
-                                  "OPENROUTER_API_KEY", "ZAI_API_KEY")
-                      if os.environ.get(k)]
+        from .analyst import ALL_KEY_ENVS
+        keys_found = [k for k in ALL_KEY_ENVS if os.environ.get(k)]
         check("analyst enabled and provider resolves", provider is not None,
               f"provider={provider}, keys={keys_found or 'NONE -- set one'}")
     else:

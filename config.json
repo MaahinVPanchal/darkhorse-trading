@@ -52,7 +52,7 @@
       "daily_call_cap": 200,
       "daily_input_token_cap": 200000
     },
-    "note": "Decision layer, veto-only. provider 'auto' tries keys in order: Jev (TYPESAFE_API_KEY, ~$0.042/M input tokens, output free -- the cheapest by far), Nebius (NEBIUS_API_KEY, OpenAI-compatible), then xAI/OpenRouter/ZAI. model=null uses each provider's default; set e.g. 'meta-llama/Llama-3.3-70B-Instruct' for Nebius. mode 'gate' lets the analyst veto entries only; it can never raise size, leverage, or trade count, and the daily budget cap in state makes the $5 credit last for months."
+    "note": "Decision layer, veto-only. provider 'auto' tries keys in order: Jev (TYPESAFE_API_KEY, ~$0.042/M input tokens), openai-decisions (OPENAI_API_KEY, gpt-6-luna, $0.10/M), then chat providers: nebius, openai, anthropic, gemini, deepseek, groq, mistral, together, xai, openrouter, zai, ollama (OLLAMA_ENABLED=1), custom (ANALYST_BASE_URL+ANALYST_API_KEY+ANALYST_MODEL = any OpenAI-compatible endpoint). mode 'gate' lets the analyst veto entries only; it can never raise size, leverage, or trade count. The daily budget cap makes any credit last for months."
   },
   "testnet": {
     "enabled": false,
