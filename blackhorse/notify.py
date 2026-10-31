@@ -57,6 +57,14 @@ def i_reason(reason):
     return f"   ({reason})"
 
 
+def digest_message(cfg, stats, total, halted):
+    return ("Blackhorse daily digest\n"
+            f"equity ${total:.4f} | trades {stats['trades']} | "
+            f"win {stats['win_rate']:.0f}%\n"
+            f"expectancy ${stats['expectancy']:+.4f}/trade | "
+            f"halted: {'YES' if halted else 'no'}")
+
+
 def test():
     """One real message to verify the wiring end to end."""
     if not configured():

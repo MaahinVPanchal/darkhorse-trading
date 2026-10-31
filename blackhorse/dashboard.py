@@ -32,6 +32,18 @@ def _mask(value):
     return value[:4] + "..." + value[-4:] if len(value) > 12 else "set"
 
 
+def _coin_pnl_series(journal):
+    from collections import defaultdict
+    rows = journal.conn.execute(
+        "SELECT coin, pnl FROM fills WHERE side='sell' AND pnl IS NOT NULL "
+        "ORDER BY id ASC").fetchall()
+    cum, series = defaultdict(float), defaultdict(list)
+    for r in rows:
+        cum[r["coin"]] += r["pnl"]
+        series[r["coin"]].append(cum[r["coin"]])
+    return dict(series)
+
+
 def _svg_curve(history, floor):
     """Server-side SVG equity curve: no JS, no CDN, works offline."""
     w, h, pad = 860, 240, 24
@@ -68,6 +80,38 @@ def _svg_curve(history, floor):
     parts.append(f"<circle cx='{lx:.1f}' cy='{ly:.1f}' r='4' fill='{color}'/>")
     parts.append(f"<text x='{lx - 70:.1f}' y='{ly - 10:.1f}' fill='{color}' "
                  f"font-size='13'>${pts[-1]:.4f}</text>")
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _svg_multicurve(series_dict):
+    """Per-coin cumulative realized PnL, one polyline per coin."""
+    w, h, pad = 860, 200, 24
+    colors = ["#3fb950", "#58a6ff", "#d29922", "#bc8cff"]
+    all_pts = [v for pts in series_dict.values() for v in pts]
+    if not all_pts:
+        return ("<svg width='100%' height='" + str(h) + "'><text x='20' y='60' "
+                "fill='#8b949e'>no closed trades yet</text></svg>")
+    lo, hi = min(min(all_pts), 0), max(max(all_pts), 1e-9)
+    if hi - lo < 1e-9:
+        lo, hi = lo - 1, hi + 1
+    span = hi - lo
+    nmax = max(len(pts) for pts in series_dict.values())
+    parts = [f"<svg viewBox='0 0 {w} {h}' width='100%' height='{h}' "
+             f"preserveAspectRatio='none'>",
+             f"<line x1='{pad}' y1='{h - pad - (0 - lo) / span * (h - 2 * pad):.1f}' "
+             f"x2='{w - pad}' y2='{h - pad - (0 - lo) / span * (h - 2 * pad):.1f}' "
+             f"stroke='#30363d' stroke-width='1'/>"]
+    for i, (coin, pts) in enumerate(series_dict.items()):
+        color = colors[i % len(colors)]
+        path = " ".join(
+            f"{pad + j / max(nmax - 1, 1) * (w - 2 * pad):.1f},"
+            f"{h - pad - (v - lo) / span * (h - 2 * pad):.1f}"
+            for j, v in enumerate(pts))
+        parts.append(f"<polyline points='{path}' fill='none' "
+                     f"stroke='{color}' stroke-width='2'/>")
+        parts.append(f"<text x='{pad + i * 130 + 4}' y='16' fill='{color}' "
+                     f"font-size='12'>{coin} ${pts[-1]:+.4f}</text>")
     parts.append("</svg>")
     return "".join(parts)
 
@@ -109,6 +153,7 @@ def build_data(cfg, journal):
         "start_balance": cfg["paper"]["start_balance_usd"],
         "stats": stats, "positions": positions,
         "fees_paid": journal.total_fees(),
+        "coin_pnl_series": _coin_pnl_series(journal),
         "fills": fills, "decisions": decisions,
         "analyst": {"enabled": cfg["analyst"].get("enabled", False),
                     "mode": cfg["analyst"].get("mode"), "provider": provider,
@@ -164,6 +209,8 @@ PAGE = """<!doctype html>
 
 <div class="row">
 <div style="flex:1;min-width:340px">
+{coin_section}
+
 <h2>agent hive &mdash; who is connected, with what</h2>
 <table>
   <tr><th>agent</th><th>key / connection</th><th>power</th></tr>
@@ -274,6 +321,9 @@ def render(data, cfg):
         f"{k['name']}={k['status']}" if k["status"]
         else f"<span class='muted'>{k['name']}=not set</span>"
         for k in data["keys"])
+    coin_curve = _svg_multicurve(data["coin_pnl_series"])
+    coin_section = ("<h2>realized pnl by coin (cumulative, per closed trade)</h2>"
+                    + coin_curve)
     halt_banner = ""
     if data["halted"]:
         halt_banner = f"<div class='banner halt'>HALTED: {data['halt_reason']} -- run resume.bat to re-enable</div>"
@@ -287,6 +337,7 @@ def render(data, cfg):
         exp_html=_fmt_pnl(s["expectancy"]), pf=pf,
         fees=f"${data['fees_paid']:.4f}",
         floor=f"${data['floor']:.2f}", curve=_svg_curve(hist, data["floor"]),
+        coin_section=coin_section,
         a_provider=a["provider"] or "rules-only", a_key_line=key_line,
         a_power=a_power, a_calls=a["calls_today"],
         a_call_cap=a["call_cap"] or 0, a_toks=a["tokens_today"],

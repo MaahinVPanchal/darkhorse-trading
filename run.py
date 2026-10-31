@@ -16,7 +16,7 @@ import sys
 
 import requests
 
-from blackhorse import analyst, dashboard, doctor, guards, learn, loop, market
+from blackhorse import analyst, dashboard, doctor, guards, learn, loop, market, notify
 from blackhorse.journal import Journal
 from blackhorse.paper import PaperBroker
 
@@ -122,16 +122,120 @@ def cmd_learn(cfg, args):
 
 
 def cmd_live(cfg, args):
-    print("Real-money trading is disabled in config.json (live.enabled=false).")
-    print("This is deliberate. Before enabling it you must:")
-    print("  1. run paper mode for several weeks with positive expectancy")
-    print("  2. practice on Hyperliquid TESTNET with a trade-only API wallet")
-    print("  3. accept that perps can liquidate the whole account")
-    print("  4. clear the India access/tax questions with a qualified adviser")
-    print("Even then, the engine refuses to start unless config.json has")
-    print('  live.acknowledgement = "I-ACCEPT-REAL-MONEY-RISK"')
-    print("The live execution adapter is intentionally not implemented yet.")
-    sys.exit(1)
+    """Rung 3: REAL money. Triple gate: config + ACK + promotion criteria."""
+    from blackhorse import promotion
+    journal = Journal()
+    ok, detail = promotion.report(journal, cfg)
+    ack_set = cfg["live"].get("acknowledgement") == "I-ACCEPT-REAL-MONEY-RISK"
+    print("LIVE TRADING GATE (real money)")
+    print(f"  live.enabled: {cfg['live'].get('enabled')}")
+    print(f"  ACK string set: {ack_set}")
+    print("  promotion criteria (computed from journal, not editable):")
+    print(detail)
+    ready = cfg["live"].get("enabled") and ack_set and ok
+    if not ready:
+        print("\nGATES NOT PASSED -- live trading refused. Paper keeps running.")
+        sys.exit(1)
+    print("\nAll gates passed. Starting MAINNET trading with REAL money.")
+    print("Perps can liquidate the entire account.\n")
+    try:
+        from blackhorse.mainnet_broker import MainnetBroker
+        broker = MainnetBroker(journal, cfg)
+    except ImportError:
+        print("hyperliquid-python-sdk missing: pip install hyperliquid-python-sdk")
+        sys.exit(1)
+    except RuntimeError as e:
+        print(f"Setup problem: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Could not reach mainnet: {e.__class__.__name__}: {e}")
+        sys.exit(1)
+    account = broker.equity()
+    cfg["paper"]["start_balance_usd"] = max(
+        2 * cfg["halt"]["equity_floor_usd"], account)
+    print(f"wallet: {broker.address} | account value: ${account:.2f} (REAL)")
+    try:
+        loop.run(journal, broker, cfg,
+                 cycles=(1 if args.once else args.cycles), use_analyst=True)
+    except KeyboardInterrupt:
+        print("\nStopped. Journal updated -- `python run.py report`.")
+
+
+def cmd_digest(cfg, args):
+    """One Telegram/console summary: equity, trades, criteria verdict."""
+    from blackhorse import notify, promotion
+    journal = Journal()
+    stats = journal.trade_stats()
+    eq = journal.latest_equity()
+    total = eq["total"] if eq else cfg["paper"]["start_balance_usd"]
+    halted = guards.is_halted(journal)
+    ok, detail = promotion.report(journal, cfg)
+    msg = notify.digest_message(cfg, stats, total, halted)
+    print(msg)
+    print("  promotion: " + ("ALL PASS" if ok else "not yet"))
+    if notify.configured():
+        notify.send(msg, silent=True)
+        print("  (sent to Telegram)")
+    else:
+        print("  (Telegram not configured -- setx TELEGRAM_BOT_TOKEN / CHAT_ID)")
+
+
+def cmd_audit(cfg, args):
+    """Secrets scan over git history -- go-public readiness."""
+    import re
+    import subprocess
+    log = subprocess.run(["git", "log", "-p", "--all"], capture_output=True,
+                         text=True, errors="ignore").stdout
+    tracked = subprocess.run(["git", "ls-files"], capture_output=True,
+                             text=True).stdout.split()
+    print(f"scanning {len(log):,} chars of git history, {len(tracked)} tracked files")
+    patterns = {
+        "private key (0x + 64 hex)": "0x[a-fA-F0-9]{64}",
+        "AWS access key": "AKIA[0-9A-Z]{16}",
+        "inline token/secret": "(?i)(token|secret|api[_-]?key)[:=][A-Za-z0-9_]{20,}",
+    }
+    clean = True
+    for name, pat in patterns.items():
+        hits = re.findall(pat, log)
+        print(f"  [{'FAIL' if hits else 'OK'}] {name}: {len(hits)} hit(s)")
+        clean = clean and not hits
+    bad_files = [f for f in tracked if f == ".env" or f.endswith(".db")]
+    print(f"  [{'FAIL' if bad_files else 'OK'}] .env / *.db tracked: {bad_files or 'none'}")
+    clean = clean and not bad_files
+    print("\nsecrets audit:", "CLEAN -- public-ready" if clean
+          else "DIRTY -- do NOT go public; rotate any exposed key")
+    sys.exit(0 if clean else 1)
+
+
+def cmd_panic(cfg, args):
+    """Kill switch: flatten everything NOW, latch the halt."""
+    journal = Journal()
+    prices = market.all_mids()
+    broker = None
+    if cfg.get("testnet", {}).get("enabled") and os.environ.get("BLACKHORSE_TESTNET_KEY"):
+        try:
+            from blackhorse.testnet_broker import TestnetBroker
+            broker = TestnetBroker(journal, cfg)
+        except Exception as e:
+            print(f"testnet broker unavailable ({e.__class__.__name__}) -- "
+                  f"REAL positions may need MANUAL closing!")
+    if broker is None:
+        broker = PaperBroker(journal, cfg)
+    closed = []
+    for p in journal.all_positions():
+        price = prices.get(p["coin"], p["avg_price"])
+        try:
+            fill = broker.close_position(p["coin"], price, "panic-exit",
+                                         "manual kill switch")
+        except Exception as e:
+            print(f"FAILED to close {p['coin']}: {e} -- close it MANUALLY")
+            continue
+        if fill:
+            closed.append(fill)
+    guards.halt(journal, "manual kill switch (panic)")
+    notify.send("PANIC: positions closed, halt latched. resume.bat to re-enable.")
+    print(f"closed {len(closed)} position(s); halt latched. "
+          f"resume.bat to re-enable.")
 
 
 def cmd_analyst_test(cfg, args):
@@ -292,6 +396,15 @@ def cmd_reconcile(cfg, args):
             xpos[pi["coin"]] = xpos.get(pi["coin"], 0.0) + float(pi["szi"])
         print(f"\n[{label}] reconciliation for {address}")
         print(f"  account value: ${float(st.get('marginSummary', {}).get('accountValue', 0)):.2f}")
+        try:
+            fr = requests.post(f"{base}/info", json={
+                "type": "userFunding", "user": address}, timeout=12)
+            fr.raise_for_status()
+            fundings = fr.json()
+            net = sum(float(f.get("usdc", 0)) for f in fundings)
+            print(f"  funding history: {len(fundings)} events, net {net:+.4f} USDC")
+        except Exception:
+            pass
         coins = sorted(set(jpos) | set(xpos))
         if not coins:
             print("  no positions on either side -- trivially PASS")
@@ -333,7 +446,8 @@ def main():
     ap.add_argument("command",
                     choices=["paper", "report", "learn", "live", "resume",
                              "dashboard", "doctor", "analyst-test", "testnet",
-                             "account", "notify-test", "reconcile"])
+                             "account", "notify-test", "reconcile",
+                             "digest", "audit", "panic"])
     ap.add_argument("--address", default=None,
                     help="account: read-only lookup of this 0x address")
     ap.add_argument("--once", action="store_true", help="run a single cycle")
@@ -353,7 +467,10 @@ def main():
      "testnet": lambda: cmd_testnet(cfg, args),
      "account": lambda: cmd_account(cfg, args),
      "notify-test": lambda: cmd_notify_test(cfg, args),
-     "reconcile": lambda: cmd_reconcile(cfg, args)}[args.command]()
+     "reconcile": lambda: cmd_reconcile(cfg, args),
+     "digest": lambda: cmd_digest(cfg, args),
+     "audit": lambda: cmd_audit(cfg, args),
+     "panic": lambda: cmd_panic(cfg, args)}[args.command]()
 
 
 if __name__ == "__main__":

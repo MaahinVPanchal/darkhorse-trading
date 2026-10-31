@@ -1,72 +1,70 @@
 # 📦 Batch Plan — resources iterated, work in batches of 10
 
-Resources iterated this session: **GitHub** (hummingbot, jesse, virattt/ai-hedge-fund,
-nautilus_trader, freqtrade), **StackOverflow/Reddit** (SSL diagnosis), **nautilustrader.io**,
-**openalgo.in**, **nexustrade.io**.
+Resources iterated: **GitHub** (hummingbot, jesse, virattt/ai-hedge-fund,
+nautilus_trader, freqtrade, beebots, jev-trader), **StackOverflow/Reddit**
+(SSL root-cause), **nautilustrader.io**, **openalgo.in**, **nexustrade.io**,
+plus prop-firm edge research (see **EDGE_RESEARCH.md**).
 
-## Research findings → what we adopt
+## Research findings → what we adopted
 
 | Resource | Finding | Adopted as |
 |---|---|---|
-| **nautilustrader.io** | Event-sourced durable log + **reconciliation soak loops** (journal vs venue, always) | `run.py reconcile` (Batch 1) |
-| nautilustrader.io | Research-to-live parity: same engine backtest & live; typed config | already our design (paper/testnet same loop) |
-| **openalgo.in** | India-focused unified broker bridge (35+ brokers), server-side risk ("stops survive a closed browser"), sandbox mode | Future bridge if Indian brokers (Zerodha etc.) are ever wanted — AGPL note |
-| **nexustrade.io** | **Walk-forward with embargo gap** between train/validate (14-day embargo) | `learn.py` `embargo_bars: 20` (Batch 1) |
-| nexustrade.io | Live automation gated behind explicit approval | already our ACK gate |
-| **StackOverflow/Reddit** | `WRONG_VERSION_NUMBER` = proxy/captive-portal interception | Diagnosed: NO local proxy (env/registry/winhttp all clean) → filter is upstream (ISP). Fix: different network |
+| **nautilustrader.io** | Event-sourced durable log + **reconciliation soak loops** | `run.py reconcile` + `journal.events` order-state log |
+| nautilustrader.io | Research-to-live parity; typed config | same loop for paper/testnet/mainnet |
+| **openalgo.in** | India broker bridge (35+), server-side risk | Batch 3 evaluation note |
+| **nexustrade.io** | **Walk-forward with embargo gap** | `learn.py` `embargo_bars: 20` |
+| nexustrade.io | Approval-gated live automation | ACK gate + `promotion.py` code-enforced criteria |
+| **StackOverflow/Reddit** | `WRONG_VERSION_NUMBER` = proxy/captive portal | Diagnosed: no local proxy → upstream ISP filter |
+| **EDGE_RESEARCH.md** | Jane Street: many small edges + cost control + discipline; funding carry = best retail-evidence edge | roadmap: funding filter, OBI filter, Donchian engine |
 
 ---
 
-## BATCH 1 — Diagnose, reconcile, embargo (this batch)
+## BATCH 1 — Diagnose, reconcile, embargo — ✅ 10/10
+
+Proxy diagnosis · testnet retest · NautilusTrader/OpenAlgo/NexusTrade research ·
+SSL root-cause · `reconcile` · learn embargo · live tests · commit/push · runbook.
+
+## BATCH 2 — Auto-working hardening — ✅ 10/10
 
 | # | Task | Status |
 |---|---|---|
-| 1 | Proxy diagnosis (env + registry + winhttp) | ✅ no proxy — upstream filter confirmed |
-| 2 | Testnet reachability retest (direct + no-proxy) | ✅ still filtered |
-| 3 | NautilusTrader research | ✅ done |
-| 4 | OpenAlgo research | ✅ done |
-| 5 | NexusTrade research | ✅ done |
-| 6 | StackOverflow SSL root-cause research | ✅ done |
-| 7 | `run.py reconcile` — journal vs venue, read-only | ✅ built |
-| 8 | `learn.py` embargo between train/validate (NexusTrade pattern) | ✅ built |
-| 9 | Test reconcile + embargoed learn on live data | ✅ below |
-| 10 | Commit + push; user runbook for the one manual step | ✅ |
+| 1 | `watchdog.bat` auto-restart wrapper | ✅ |
+| 2 | Telegram daily digest (`run.py digest`, auto-sends if configured) | ✅ |
+| 3 | Reconcile step in Monday automation | ✅ |
+| 4 | Nautilus-style order-state event log (submitted/filled/rejected) | ✅ `journal.events` + testnet broker |
+| 5 | Multi-timeframe gate (1h EMA filter before 15m entries) | ✅ `config.mtf` |
+| 6 | Per-coin realized-PnL curves in dashboard | ✅ |
+| 7 | Third engine: Donchian breakout | ✅ `strategy._eval_breakout` |
+| 8 | Engine leaderboard persisted across weeks | ✅ `learn_history.jsonl` |
+| 9 | Secrets-audit script (`run.py audit`) | ✅ verdict: CLEAN |
+| 10 | Fee/funding reconciliation | ✅ `reconcile` shows userFunding |
 
-## BATCH 2 — Auto-working hardening (next session)
+## BATCH 3 — Live-adjacent — 6/10 done, rest by design
 
-| # | Task | Depends on |
+| # | Task | Status |
 |---|---|---|
-| 1 | `watchdog.bat`: auto-restart wrapper for continuous paper mode | — |
-| 2 | Telegram **daily summary** (one message/day, not per fill) | TELEGRAM_* keys |
-| 3 | Reconcile step added to Monday automation | — |
-| 4 | Nautilus-style order-state log (submitted/filled/rejected events) | testnet key |
-| 5 | Multi-timeframe gate: 1h trend filter before 15m entries | — |
-| 6 | Per-coin equity curves in dashboard | — |
-| 7 | Third engine: breakout (Donchian) | — |
-| 8 | Engine leaderboard persisted across weeks (learn history) | — |
-| 9 | Secrets-audit script (`git log -p` scan) for public-readiness | — |
-| 10 | Exchange fee/funding reconciliation (beebots "books match" panel) | testnet key |
-
-## BATCH 3 — Live-adjacent (only after ALL pre-registered criteria pass)
-
-| # | Task |
-|---|---|
-| 1 | Mainnet adapter (official SDK, trade-only API wallet) |
-| 2 | Exchange-side stop orders + dead-man's switch on every entry |
-| 3 | OpenAlgo bridge evaluation (if Indian brokers ever desired) |
-| 4 | Latency + partial-fill modeling upgrade (Nautilus fill models) |
-| 5 | Kill-switch command + watchdog alerting |
-| 6–10 | Reserved: scale decisions, position sizing evolution, regime classifier |
+| 1 | Mainnet adapter (`blackhorse/mainnet_broker.py`) | ✅ TRIPLE-GATED: live.enabled + exact ACK + promotion criteria computed from journal |
+| 2 | Exchange-side stop orders + dead-man's switch | ⏸ deferred — needs a live testnet session to verify trigger orders (code slot ready) |
+| 3 | OpenAlgo bridge evaluation | ✅ research note (AGPL caveat) |
+| 4 | Latency + partial-fill modeling upgrade | ⏸ reserved — paper modeling already covers fee+slip; upgrade when testnet data exists |
+| 5 | Kill-switch (`run.py panic`) + watchdog | ✅ |
+| 6 | Regime classifier (trend/range tagging in learner) | ⏸ reserved |
+| 7 | Funding-rate signal as position filter | ⏸ reserved — data already fetched in reconcile |
+| 8 | OBI filter via public `l2Book` | ⏸ reserved |
+| 9 | Position-sizing evolution (fixed-fractional → vol-adjusted) | ⏸ reserved |
+| 10 | Scale-out/take-profit laddering | ⏸ reserved |
 
 ---
 
-## 🔑 The one manual step (all of Batch 2/3 waits on this)
+## 🔑 The one manual step (everything else is automatic)
 
-Testnet is **ISP-filtered on this network** (no proxy present — verified). So:
+Testnet is **ISP-filtered on this network** (verified: no proxy, upstream filter):
 
-1. On a network that reaches `app.hyperliquid-testnet.xyz` (phone hotspot works):
-   connect MetaMask → **API page** → **Approve API Wallet** → sign (free) → copy the private key.
-2. Double-click `connect_wallet.bat` → paste into the hidden prompt → done
-   (saves `BLACKHORSE_TESTNET_KEY`, verifies, shows your test balances).
-3. `testnet.enabled: true` → `testnet.bat` — the bot starts spending your test
-   ETH/USDC with all guards active.
+1. On a network that reaches `app.hyperliquid-testnet.xyz` (phone hotspot):
+   MetaMask → **API page** → **Approve API Wallet** → sign (free) → copy key.
+2. `connect_wallet.bat` → paste into hidden prompt → auto-saves + verifies.
+3. `testnet.enabled: true` → `testnet.bat` → real orders, mock money, all guards.
+
+Live mainnet (`run.py live`) is code-complete and refuses until
+`live.enabled` + exact ACK string + ALL promotion criteria pass — computed
+from the journal, not editable.

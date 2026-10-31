@@ -89,11 +89,20 @@ class TestnetBroker:
 
     def open_position(self, coin, price, notional, reason, analyst_note=None):
         sz = self._round_sz(coin, notional / price)
+        self.j.record_event(coin, "order_submitted",
+                            f"market_open buy {sz} {coin} ({reason})")
         resp = self.exchange.market_open(coin, True, sz, None, self.slippage)
-        fill_px, fill_sz = self._parse_fill(resp, coin, "buy", "testnet-entry",
-                                            reason)
+        try:
+            fill_px, fill_sz = self._parse_fill(resp, coin, "buy",
+                                                "testnet-entry", reason)
+        except RuntimeError:
+            self.j.record_event(coin, "order_rejected", str(resp)[:200])
+            raise
         if fill_px is None:
+            self.j.record_event(coin, "order_unfilled", str(resp)[:200])
             raise RuntimeError(f"{coin} entry did not fill: {resp}")
+        self.j.record_event(coin, "order_filled",
+                            f"entry {fill_sz} {coin} @ {fill_px}")
         exits = self.cfg["exits"]
         stop = fill_px * (1 - exits["stop_loss_pct"] / 100)
         target = fill_px * (1 + exits["take_profit_pct"] / 100)

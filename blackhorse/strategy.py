@@ -41,6 +41,8 @@ def evaluate(candles, params):
     engine = params.get("engine", "trend")
     if engine == "meanrev":
         return _eval_meanrev(candles, params)
+    if engine == "breakout":
+        return _eval_breakout(candles, params)
     return _eval_trend(candles, params)
 
 
@@ -131,3 +133,32 @@ def _eval_meanrev(candles, params):
         "rsi_exit": rsi_exit,
         "vol_ratio": vol_ratio,
     }
+
+
+def _eval_breakout(candles, params):
+    """Donchian breakout engine: close breaks the prior N-bar high -> enter
+    (fresh break only). Exit when close breaks the prior M-bar low."""
+    n = params.get("lookback_high", 20)
+    m = params.get("lookback_low", 10)
+    if len(candles) < n + 2:
+        return {"action": "wait", "reason": "not enough history"}
+    highs = [c["high"] for c in candles]
+    lows = [c["low"] for c in candles]
+    closes = [c["close"] for c in candles]
+
+    prev_high = max(highs[-(n + 1):-1])
+    prev_high2 = max(highs[-(n + 2):-2])
+    fresh = closes[-2] <= prev_high2 and closes[-1] > prev_high
+    support = min(lows[-(m + 1):-1])
+
+    if fresh and closes[-1] > prev_high:
+        action = "enter"
+        reason = f"broke {n}-bar high {prev_high:.2f} (close {closes[-1]:.2f})"
+    elif closes[-1] < support:
+        action = "exit"
+        reason = f"broke below {m}-bar low {support:.2f}"
+    else:
+        action = "wait"
+        reason = f"inside range (high {prev_high:.2f}, low {support:.2f})"
+    return {"action": action, "reason": reason,
+            "breakout_high": prev_high, "support": support}

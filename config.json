@@ -1,13 +1,19 @@
 {
-  "symbols": ["BTC", "ETH", "SOL"],
+  "symbols": [
+    "BTC",
+    "ETH",
+    "SOL"
+  ],
   "timeframe": "15m",
   "candle_lookback": 200,
   "cycle_seconds": 60,
-
-  "paper": { "start_balance_usd": 1.0 },
-
-  "fees": { "taker_bps": 4.5, "slippage_bps": 5.0 },
-
+  "paper": {
+    "start_balance_usd": 1.0
+  },
+  "fees": {
+    "taker_bps": 4.5,
+    "slippage_bps": 5.0
+  },
   "strategy": {
     "engine": "trend",
     "ema_fast": 9,
@@ -17,9 +23,10 @@
     "rsi_buy": 30,
     "rsi_exit": 55
   },
-
-  "exits": { "take_profit_pct": 1.5, "stop_loss_pct": 1.0 },
-
+  "exits": {
+    "take_profit_pct": 1.5,
+    "stop_loss_pct": 1.0
+  },
   "risk": {
     "position_pct_per_trade": 60,
     "max_position_pct_of_equity": 80,
@@ -27,45 +34,94 @@
     "daily_loss_limit_pct": 15,
     "cooldown_after_stop_min": 30
   },
-
-  "dashboard": { "port": 8765, "refresh_seconds": 15 },
-
+  "dashboard": {
+    "port": 8765,
+    "refresh_seconds": 15
+  },
   "halt": {
     "equity_floor_usd": 5.0,
     "paper_floor_pct": 50,
     "note": "For real use ($10 in): when total equity (cash + open positions, marked to live prices) touches $5.00, every position is closed and the bot latches a halt until you run 'python run.py resume'. A floor check only runs when the loop runs -- it is a guard rail, not a guarantee; exchange-side stop orders and a dead man's switch are still required for live trading. Paper accounts smaller than 2x the floor use paper_floor_pct instead so the guard is testable at $1 scale."
   },
-
   "analyst": {
     "enabled": false,
     "mode": "log",
     "provider": "auto",
     "model": null,
-    "budget": { "daily_call_cap": 200, "daily_input_token_cap": 200000 },
+    "budget": {
+      "daily_call_cap": 200,
+      "daily_input_token_cap": 200000
+    },
     "note": "Decision layer, veto-only. provider 'auto' tries keys in order: Jev (TYPESAFE_API_KEY, ~$0.042/M input tokens, output free -- the cheapest by far), Nebius (NEBIUS_API_KEY, OpenAI-compatible), then xAI/OpenRouter/ZAI. model=null uses each provider's default; set e.g. 'meta-llama/Llama-3.3-70B-Instruct' for Nebius. mode 'gate' lets the analyst veto entries only; it can never raise size, leverage, or trade count, and the daily budget cap in state makes the $5 credit last for months."
   },
-
   "testnet": {
     "enabled": false,
     "slippage": 0.05,
     "note": "Rung 2 of the ladder: REAL signed orders, MOCK money on Hyperliquid testnet. Requires: 1) pip install hyperliquid-python-sdk, 2) a TESTNET API wallet key: setx BLACKHORSE_TESTNET_KEY \"...\" (create at app.hyperliquid-testnet.xyz -> API; trade-only, cannot withdraw), 3) enabled=true, then 'python run.py testnet'. Never put a mainnet key here. If your network cannot reach api.hyperliquid-testnet.xyz, doctor will show it -- stay in paper mode until it can."
   },
-
   "live": {
     "enabled": false,
     "acknowledgement": "",
     "note": "Real-money trading is intentionally locked off. Do not enable until the paper bot shows positive expectancy over several weeks, India access/tax questions are cleared with a qualified adviser, and a testnet run with a trade-only API wallet (can trade, cannot withdraw) succeeds. Perps have a ~$10 minimum order size. Even with enabled=true, the engine refuses to run unless acknowledgement is EXACTLY 'I-ACCEPT-REAL-MONEY-RISK' -- same pattern as beebots' LIVE_ACK."
   },
-
   "learn": {
     "lookback_bars": 1500,
-    "engines": ["trend", "meanrev"],
-    "ema_fast_options": [5, 8, 9, 12, 16],
-    "ema_slow_options": [21, 26, 34, 48],
-    "rsi_buy_options": [20, 25, 30],
-    "rsi_exit_options": [45, 55, 65],
-    "tp_options": [1.0, 1.5, 2.5],
-    "sl_options": [0.7, 1.0, 1.5],
-    "min_trades_validate": 8
+    "engines": [
+      "trend",
+      "meanrev",
+      "breakout"
+    ],
+    "ema_fast_options": [
+      5,
+      8,
+      9,
+      12,
+      16
+    ],
+    "ema_slow_options": [
+      21,
+      26,
+      34,
+      48
+    ],
+    "rsi_buy_options": [
+      20,
+      25,
+      30
+    ],
+    "rsi_exit_options": [
+      45,
+      55,
+      65
+    ],
+    "tp_options": [
+      1.0,
+      1.5,
+      2.5
+    ],
+    "sl_options": [
+      0.7,
+      1.0,
+      1.5
+    ],
+    "min_trades_validate": 8,
+    "breakout_high_options": [
+      15,
+      20,
+      30
+    ],
+    "breakout_low_options": [
+      8,
+      10,
+      15
+    ],
+    "embargo_bars": 20
+  },
+  "mtf": {
+    "enabled": false,
+    "timeframe": "1h",
+    "ema_fast": 10,
+    "ema_slow": 30,
+    "note": "Multi-timeframe gate: block entries when the higher timeframe EMA trend is against the trade"
   }
 }

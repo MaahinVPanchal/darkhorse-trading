@@ -49,6 +49,13 @@ CREATE TABLE IF NOT EXISTS state (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts TEXT NOT NULL,
+    coin TEXT,
+    event TEXT NOT NULL,
+    detail TEXT
+);
 """
 
 
@@ -118,6 +125,18 @@ class Journal:
     def equity_history(self):
         return [dict(r) for r in self.conn.execute(
             "SELECT * FROM equity ORDER BY id ASC")]
+
+    # -- order-state events (Nautilus-style: submitted/filled/rejected) ----
+    def record_event(self, coin, event, detail=""):
+        self.conn.execute(
+            "INSERT INTO events (ts, coin, event, detail) VALUES (?,?,?,?)",
+            (now_iso(), coin, event, detail))
+        self.conn.commit()
+
+    def events(self, limit=20):
+        rows = self.conn.execute(
+            "SELECT * FROM events ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
 
     # -- key/value state (halts, spend counters) ---------------------------
     def get_state(self, key, default=None):

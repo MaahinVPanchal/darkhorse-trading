@@ -59,6 +59,8 @@ def _precompute(candles, engine, p1, p2, rsi_max, vol_ratio_min):
     for i in range(21, len(closes)):
         vr[i] = vols[i] / max(mean(vols[i - 20:i]), 1e-9)
     return {"closes": closes, "ef": ef, "es": es, "r": r, "vr": vr,
+            "highs": [c["high"] for c in candles],
+            "lows": [c["low"] for c in candles],
             "engine": engine, "p1": p1, "p2": p2,
             "rsi_max": rsi_max, "vol_ratio_min": vol_ratio_min}
 
@@ -66,6 +68,7 @@ def _precompute(candles, engine, p1, p2, rsi_max, vol_ratio_min):
 def _backtest(candles, ind, tp_pct, sl_pct, fee_bps, slip_bps):
     closes, ef, es, r, vr = (ind[k] for k in
                              ("closes", "ef", "es", "r", "vr"))
+    highs, lows = ind["highs"], ind["lows"]
     rsi_max, vol_ratio_min = ind["rsi_max"], ind["vol_ratio_min"]
     engine, p1, p2 = ind["engine"], ind["p1"], ind["p2"]
     trades = []
@@ -82,6 +85,8 @@ def _backtest(candles, ind, tp_pct, sl_pct, fee_bps, slip_bps):
                     and ef[i] <= es[i]:
                 exit_price = closes[i]
             elif engine == "meanrev" and r[i] is not None and r[i] >= p2:
+                exit_price = closes[i]
+            elif engine == "breakout" and i >= p2 and                     closes[i] < min(lows[i - p2:i]):
                 exit_price = closes[i]
             if exit_price is not None:
                 entry_eff = pos[2] * (1 + slip_bps / 1e4)
@@ -101,6 +106,11 @@ def _backtest(candles, ind, tp_pct, sl_pct, fee_bps, slip_bps):
                 r[i] is not None and r[i - 1] is not None
                 and r[i - 1] >= p1 and r[i] < p1
                 and vr[i] >= vol_ratio_min):
+            pos = (i, closes[i] * (1 - sl_pct / 100),
+                   closes[i] * (1 + tp_pct / 100))
+        elif engine == "breakout" and i > p1 and (
+                closes[i] > max(highs[i - p1:i])
+                and closes[i - 1] <= max(highs[i - 1 - p1:i - 1])):
             pos = (i, closes[i] * (1 - sl_pct / 100),
                    closes[i] * (1 + tp_pct / 100))
     return trades
@@ -140,6 +150,8 @@ def run(cfg, out_path="learned_proposals.json"):
                       for s in learn["ema_slow_options"] if f < s],
             "meanrev": [(b, x) for b in learn.get("rsi_buy_options", [30])
                         for x in learn.get("rsi_exit_options", [55]) if b < x],
+            "breakout": [(n, m) for n in learn.get("breakout_high_options", [20])
+                         for m in learn.get("breakout_low_options", [10])],
         }
         for engine in engines:
             for p1, p2 in param_grids.get(engine, []):
@@ -161,8 +173,11 @@ def run(cfg, out_path="learned_proposals.json"):
                         }
                         if engine == "trend":
                             row.update({"ema_fast": p1, "ema_slow": p2})
-                        else:
+                        elif engine == "meanrev":
                             row.update({"rsi_buy": p1, "rsi_exit": p2})
+                        else:
+                            row.update({"lookback_high": p1,
+                                        "lookback_low": p2})
                         results.append(row)
         results.sort(key=lambda x: x["score"], reverse=True)
         top = results[:3]
@@ -171,8 +186,10 @@ def run(cfg, out_path="learned_proposals.json"):
             b = top[0]
             if b["engine"] == "trend":
                 ptxt = f"EMA {b['ema_fast']}/{b['ema_slow']}"
-            else:
+            elif b["engine"] == "meanrev":
                 ptxt = f"RSI buy<{b['rsi_buy']} exit>={b['rsi_exit']}"
+            else:
+                ptxt = f"Donchian {b['lookback_high']}/{b['lookback_low']}"
             print(f"  {coin}: best [{b['engine']}] validation expectancy "
                   f"{b['validate']['expectancy']:+.3f}%/trade over "
                   f"{b['validate']['trades']} trades "
@@ -183,6 +200,16 @@ def run(cfg, out_path="learned_proposals.json"):
             print(f"  {coin}: no parameter set produced enough validation trades")
     with open(out_path, "w", encoding="utf-8") as fh:
         json.dump(proposals, fh, indent=2)
+    if proposals:
+        from datetime import datetime, timezone
+        day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        with open("learn_history.jsonl", "a", encoding="utf-8") as fh:
+            for pr in proposals:
+                fh.write(json.dumps({"date": day, "coin": pr["coin"],
+                                     "engine": pr["engine"],
+                                     "val_expectancy": pr["validate"]["expectancy"],
+                                     "val_trades": pr["validate"]["trades"]})
+                         + "\n")
     print(f"\nProposals written to {out_path} -- review them, then edit "
           f"config.json yourself if you accept one.")
     return proposals

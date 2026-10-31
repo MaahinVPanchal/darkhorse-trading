@@ -63,6 +63,24 @@ def run_cycle(journal, broker, cfg, use_analyst=True, verbose=True):
                                             f"analyst gate rejected: {note}", price, note)
                     continue
 
+            mtf = cfg.get("mtf", {})
+            if mtf.get("enabled"):
+                try:
+                    h1 = market.candles(coin, mtf.get("timeframe", "1h"), 60)
+                    f = strategy.ema([c["close"] for c in h1],
+                                     mtf.get("ema_fast", 10))
+                    s = strategy.ema([c["close"] for c in h1],
+                                     mtf.get("ema_slow", 30))
+                    if f is None or s is None or f < s:
+                        journal.record_decision(
+                            coin, "skip",
+                            f"MTF gate: {mtf.get('timeframe', '1h')} trend down",
+                            price, note)
+                        continue
+                except Exception as e:
+                    journal.record_decision(coin, "skip",
+                                            f"MTF gate error: {e}", price, note)
+                    continue
             equity = broker.equity(prices)
             notional = equity * cfg["risk"]["position_pct_per_trade"] / 100.0
             allowed, reasons = risk.check(notional, equity, journal, cfg,
