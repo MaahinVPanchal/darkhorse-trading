@@ -56,6 +56,7 @@ pip install -r requirements.txt   # requests + hyperliquid sdk — that's all
 
 | Double-click | What happens |
 |---|---|
+| 🚀 `start_blackhorse.bat` | **one click = everything**: paper bot (auto-restart) + dashboard, browser opens |
 | 🟢 `run_paper.bat` | **paper-trades live crypto prices** with simulated money. Leave the window open. |
 | 📊 `run_dashboard.bat` | opens **http://127.0.0.1:8765** — watch the agents work |
 | 🧾 `run_report.bat` | scoreboard: equity, win rate, profit factor, drawdown, fees |
